@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: skhovyshche-online
+    runtime: node
+    plan: free
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /api/health
+    maxShutdownDelaySeconds: 30

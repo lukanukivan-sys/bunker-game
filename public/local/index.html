@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#161a1d" />
+  <title>Сховище — локальний прототип</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="noise"></div>
+
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Локальний прототип · версія 0.5</p>
+      <h1>СХОВИЩЕ</h1>
+    </div>
+    <button id="resetGameButton" class="button button-ghost hidden" type="button">Нова партія</button>
+  </header>
+
+  <main class="page-shell">
+    <section id="setupScreen" class="screen active">
+      <div class="hero-panel">
+        <div>
+          <p class="eyebrow">Соціальна гра про виживання</p>
+          <h2>Кого ви залишите за дверима?</h2>
+          <p class="lead">
+            Створіть приватну партію для своєї компанії. Гра згенерує катастрофу,
+            сховище, персонажів, події та рідкісні абсурдні комбінації.
+          </p>
+        </div>
+        <div class="hero-mark">☢</div>
+      </div>
+
+      <form id="setupForm" class="setup-grid">
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">01</p>
+              <h3>Гравці</h3>
+            </div>
+            <span id="playerCountLabel" class="badge">6 гравців</span>
+          </div>
+
+          <label class="field-label" for="playerNames">Імена, кожне з нового рядка</label>
+          <textarea id="playerNames" rows="10" spellcheck="false">Іван
+Марія
+Олег
+Андрій
+Софія
+Назар</textarea>
+          <p class="hint">Від 4 до 12 гравців. Порожні рядки буде проігноровано.</p>
+        </section>
+
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">02</p>
+              <h3>Параметри партії</h3>
+            </div>
+          </div>
+
+          <div class="form-stack">
+            <label>
+              <span class="field-label">Сетинг</span>
+              <select id="settingSelect">
+                <option value="modern">Наші дні</option>
+                <option value="fantasy">Темне фентезі</option>
+                <option value="space">Далекий космос</option>
+              </select>
+            </label>
+
+            <label>
+              <span class="field-label">Кількість місць у сховищі</span>
+              <input id="shelterCapacity" type="number" min="2" max="10" value="3" />
+            </label>
+
+            <label>
+              <span class="field-label">Кількість раундів</span>
+              <input id="roundCount" type="number" min="2" max="7" value="4" />
+            </label>
+
+            <label>
+              <span class="field-label">Рівень абсурду: <strong id="absurdityValue">2 — збалансовано</strong></span>
+              <input id="absurdityLevel" type="range" min="0" max="4" value="2" step="1" />
+            </label>
+
+            <label class="toggle-row">
+              <span>
+                <strong>Унікальні професії</strong>
+                <small>Не повторювати професії в одній партії.</small>
+              </span>
+              <input id="uniqueProfessions" type="checkbox" checked />
+            </label>
+
+            <label class="toggle-row">
+              <span>
+                <strong>Мінімізувати повтори</strong>
+                <small>По можливості не повторювати здоров’я, навички, риси, багаж, хобі, фобії, таємниці та здібності.</small>
+              </span>
+              <input id="minimizeRepeats" type="checkbox" checked />
+            </label>
+
+            <label>
+              <span class="field-label">Рішення у подіях</span>
+              <select id="eventDecisionMode">
+                <option value="vote" selected>Таємне голосування всіх гравців</option>
+                <option value="direct">Спільне рішення без голосування</option>
+              </select>
+            </label>
+
+            <label>
+              <span class="field-label">Таймер обговорення</span>
+              <select id="discussionMinutes">
+                <option value="0">Без таймера</option>
+                <option value="3" selected>3 хвилини</option>
+                <option value="5">5 хвилин</option>
+                <option value="8">8 хвилин</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="setup-actions">
+            <button class="button button-primary button-large" type="submit">Згенерувати партію</button>
+            <button id="resumeGameButton" class="button button-secondary full-width hidden" type="button">Продовжити збережену партію</button>
+          </div>
+        </section>
+      </form>
+    </section>
+
+    <section id="gameScreen" class="screen">
+      <div class="game-status-grid">
+        <section class="panel danger-panel">
+          <p class="eyebrow">Катастрофа</p>
+          <h2 id="catastropheTitle"></h2>
+          <p id="catastropheDescription" class="lead compact"></p>
+          <div id="catastropheTags" class="tag-row"></div>
+        </section>
+
+        <section class="panel">
+          <p class="eyebrow">Сховище</p>
+          <h2 id="shelterTitle"></h2>
+          <p id="shelterDescription" class="lead compact"></p>
+          <div id="shelterStats" class="stats-grid"></div>
+          <div class="subsection-heading">
+            <p class="eyebrow">Поточний стан</p>
+            <h3>Ресурси й системи</h3>
+          </div>
+          <div id="shelterResources" class="resource-list"></div>
+          <div class="subsection-heading assets-heading">
+            <p class="eyebrow">Надбання</p>
+            <h3>Союзники та знахідки</h3>
+          </div>
+          <div id="shelterAssets" class="asset-list"></div>
+          <div class="subsection-heading assets-heading">
+            <p class="eyebrow">Інфраструктура</p>
+            <h3>Модулі сховища</h3>
+          </div>
+          <div id="shelterModules" class="module-grid"></div>
+        </section>
+      </div>
+
+      <section class="round-strip phase-strip">
+        <div>
+          <p class="eyebrow">Стан партії</p>
+          <h3 id="roundTitle">Раунд 1</h3>
+          <div id="phaseSteps" class="phase-steps"></div>
+        </div>
+        <div class="round-actions">
+          <span id="phaseBadge" class="badge badge-accent">Розкриття</span>
+          <div id="discussionTimer" class="discussion-timer hidden">
+            <strong id="discussionTimerValue">03:00</strong>
+            <button id="discussionTimerButton" class="button button-ghost" type="button">Запустити</button>
+          </div>
+          <button id="shelterWorkButton" class="button button-secondary" type="button">Роботи у сховищі</button>
+          <button id="expeditionButton" class="button button-secondary" type="button">Експедиція</button>
+          <button id="showEventButton" class="button button-secondary" type="button">Подія раунду</button>
+          <button id="nextRoundButton" class="button button-primary" type="button">До обговорення</button>
+        </div>
+      </section>
+
+      <div class="game-layout">
+        <aside class="panel player-list-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Гравці</p>
+              <h3>Учасники</h3>
+            </div>
+          </div>
+          <div id="playerList" class="player-list"></div>
+          <section class="roles-box">
+            <div class="roles-box-heading">
+              <div>
+                <p class="eyebrow">Обов’язки</p>
+                <h4>Ролі у сховищі</h4>
+              </div>
+              <button id="manageRolesButton" class="button button-ghost" type="button">Розподілити</button>
+            </div>
+            <div id="rolesSummary" class="roles-summary"></div>
+          </section>
+          <button id="startVotingButton" class="button button-danger full-width" type="button">Почати голосування</button>
+        </aside>
+
+        <section class="panel character-panel">
+          <div id="privateGuard" class="private-guard">
+            <div class="private-icon">◉</div>
+            <h3 id="privateGuardTitle">Передайте пристрій гравцеві</h3>
+            <p id="privateGuardText">Його приховані характеристики будуть показані лише після підтвердження.</p>
+            <button id="showCharacterButton" class="button button-primary" type="button">Показати персонажа</button>
+          </div>
+
+          <div id="characterView" class="hidden">
+            <div class="character-heading">
+              <div>
+                <p class="eyebrow">Особиста картка</p>
+                <h2 id="characterName"></h2>
+                <p id="characterSummary" class="lead compact"></p>
+              </div>
+              <span id="characterMode" class="badge"></span>
+            </div>
+
+            <div id="characterCondition" class="condition-banner"></div>
+            <section id="personalGoalBox" class="personal-goal-box">
+              <p class="eyebrow">Прихована особиста мета</p>
+              <h3 id="personalGoalName"></h3>
+              <p id="personalGoalDescription"></p>
+            </section>
+            <div id="characteristicsGrid" class="characteristics-grid"></div>
+
+            <section class="ability-box">
+              <div>
+                <p class="eyebrow">Особлива здібність</p>
+                <h3 id="abilityName"></h3>
+                <p id="abilityDescription"></p>
+              </div>
+              <button id="useAbilityButton" class="button button-secondary" type="button">Використати</button>
+            </section>
+
+            <button id="hideCharacterButton" class="button button-ghost full-width" type="button">Сховати картку й передати пристрій</button>
+          </div>
+        </section>
+
+        <aside class="right-column">
+          <section class="panel public-board-panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Спільне поле</p>
+                <h3>Відкриті дані</h3>
+              </div>
+            </div>
+            <div id="publicBoard" class="public-board"></div>
+          </section>
+
+          <section class="panel log-panel">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Хід партії</p>
+                <h3>Журнал</h3>
+              </div>
+            </div>
+            <div id="gameLog" class="game-log"></div>
+          </section>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="eventDialog" class="modal">
+    <div class="modal-card modal-wide event-modal-card">
+      <button id="eventCloseButton" class="modal-close" type="button" aria-label="Закрити" disabled>×</button>
+      <p class="eyebrow">Подія раунду</p>
+      <div class="event-symbol">⚠</div>
+      <h2 id="eventTitle"></h2>
+      <p id="eventDescription" class="lead compact"></p>
+
+      <div class="event-decision-heading">
+        <h3>Оберіть рішення групи</h3>
+        <p>Навички всіх активних персонажів автоматично впливають на шанс успіху, навіть якщо їх ще не відкрито.</p>
+      </div>
+      <div id="eventChoices" class="event-choices"></div>
+      <button id="startEventVoteButton" class="button button-primary full-width hidden" type="button">Почати таємне голосування за рішення</button>
+
+      <section id="eventOutcome" class="event-outcome hidden">
+        <p class="eyebrow">Наслідок рішення</p>
+        <p id="eventOutcomeText" class="event-outcome-text"></p>
+        <div id="eventOutcomeChanges" class="outcome-changes"></div>
+      </section>
+
+      <button id="eventContinueButton" class="button button-primary full-width" type="button" disabled>Завершити подію</button>
+    </div>
+  </dialog>
+
+  <dialog id="eventVotingDialog" class="modal">
+    <div class="modal-card modal-wide">
+      <button id="cancelEventVoteButton" class="modal-close" type="button" aria-label="Закрити">×</button>
+      <p class="eyebrow">Таємне голосування</p>
+      <h2 id="eventVotingTitle">Рішення групи</h2>
+      <p class="lead compact">Передавайте пристрій по черзі. Кожен активний гравець обирає один варіант.</p>
+      <div id="eventVotingProgress" class="voting-progress"></div>
+      <div id="eventVotingChoices" class="voting-choices event-voting-choices"></div>
+      <button id="submitEventVoteButton" class="button button-primary full-width" type="button" disabled>Підтвердити вибір</button>
+    </div>
+  </dialog>
+
+  <dialog id="rolesDialog" class="modal">
+    <form id="rolesForm" class="modal-card modal-wide">
+      <button id="closeRolesButton" class="modal-close" type="button" aria-label="Закрити">×</button>
+      <p class="eyebrow">Організація сховища</p>
+      <h2>Розподілити обов’язки</h2>
+      <p class="lead compact">Кожну роль може виконувати лише один активний гравець. Ролі впливають на перевірки подій і фінальну симуляцію.</p>
+      <div id="rolesAssignments" class="role-assignments"></div>
+      <menu class="modal-actions">
+        <button id="cancelRolesButton" class="button button-ghost" type="button">Скасувати</button>
+        <button id="saveRolesButton" class="button button-primary" type="submit">Зберегти ролі</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="abilityDialog" class="modal">
+    <form id="abilityForm" method="dialog" class="modal-card">
+      <button class="modal-close" value="cancel" aria-label="Закрити">×</button>
+      <p class="eyebrow">Застосування здібності</p>
+      <h2 id="abilityDialogTitle"></h2>
+      <p id="abilityDialogDescription" class="lead compact"></p>
+      <label id="abilityTargetWrapper">
+        <span class="field-label">Оберіть ціль</span>
+        <select id="abilityTarget"></select>
+      </label>
+      <menu class="modal-actions">
+        <button class="button button-ghost" value="cancel">Скасувати</button>
+        <button id="confirmAbilityButton" class="button button-primary" value="confirm">Застосувати</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="votingDialog" class="modal">
+    <form id="votingForm" method="dialog" class="modal-card modal-wide">
+      <button class="modal-close" value="cancel" aria-label="Закрити">×</button>
+      <p class="eyebrow">Голосування</p>
+      <h2>Кого залишити за дверима?</h2>
+      <p class="lead compact">Передавайте пристрій по черзі. Кожен активний гравець віддає один голос.</p>
+      <div id="votingProgress" class="voting-progress"></div>
+      <div id="votingChoices" class="voting-choices"></div>
+      <menu class="modal-actions">
+        <button class="button button-ghost" value="cancel">Скасувати</button>
+        <button id="submitVoteButton" class="button button-danger" type="button">Віддати голос</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="resultDialog" class="modal">
+    <form method="dialog" class="modal-card modal-wide">
+      <button class="modal-close" aria-label="Закрити">×</button>
+      <p class="eyebrow">Результат голосування</p>
+      <h2 id="resultTitle"></h2>
+      <p id="resultDescription" class="lead compact"></p>
+      <div id="voteResults" class="vote-results"></div>
+      <button class="button button-primary full-width">Продовжити</button>
+    </form>
+  </dialog>
+
+  <dialog id="finalDialog" class="modal">
+    <form method="dialog" class="modal-card modal-wide final-card">
+      <p class="eyebrow">Після закриття дверей</p>
+      <h2>Хроніка виживання</h2>
+      <div id="finalChronicle" class="chronicle"></div>
+      <button id="finishGameButton" class="button button-primary full-width">Завершити партію</button>
+    </form>
+  </dialog>
+
+
+  <dialog id="expeditionDialog" class="modal">
+    <form id="expeditionForm" class="modal-card modal-wide">
+      <button id="closeExpeditionButton" class="modal-close" type="button" aria-label="Закрити">×</button>
+      <p class="eyebrow">Вихід за межі сховища</p>
+      <h2>Підготувати експедицію</h2>
+      <p class="lead compact">Оберіть маршрут і від одного до двох учасників. Їхні реальні навички вплинуть на шанс успіху, навіть якщо картки ще не відкрито.</p>
+      <div id="expeditionLocations" class="expedition-location-list"></div>
+      <div class="subsection-heading"><p class="eyebrow">Команда</p><h3>Учасники експедиції</h3></div>
+      <div id="expeditionPlayers" class="expedition-player-list"></div>
+      <div id="expeditionPreview" class="action-preview"></div>
+      <menu class="modal-actions">
+        <button id="cancelExpeditionButton" class="button button-ghost" type="button">Скасувати</button>
+        <button id="launchExpeditionButton" class="button button-primary" type="submit">Вирушити</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="workDialog" class="modal">
+    <form id="workForm" class="modal-card modal-wide">
+      <button id="closeWorkButton" class="modal-close" type="button" aria-label="Закрити">×</button>
+      <p class="eyebrow">Планові роботи</p>
+      <h2>Обслуговування модулів</h2>
+      <p class="lead compact">Призначте одного активного гравця на ремонт або покращення обраного модуля.</p>
+      <div class="two-column-form">
+        <label><span class="field-label">Модуль</span><select id="workModule"></select></label>
+        <label><span class="field-label">Виконавець</span><select id="workPlayer"></select></label>
+      </div>
+      <div id="workPreview" class="action-preview"></div>
+      <menu class="modal-actions">
+        <button id="cancelWorkButton" class="button button-ghost" type="button">Скасувати</button>
+        <button id="performWorkButton" class="button button-primary" type="submit">Виконати роботи</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="app.js"></script>
+  <script src="v05.js"></script>
+</body>
+</html>
