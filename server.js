@@ -5949,6 +5949,17 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
     const pathname = decodeURIComponent(url.pathname);
+
+    // Render та інші хмарні проксі мають коректно відкривати головну адресу
+    // без необхідності вручну додавати /index.html.
+    if (pathname === "/" && (req.method === "GET" || req.method === "HEAD")) {
+      res.writeHead(302, {
+        Location: "/index.html",
+        "Cache-Control": "no-store"
+      });
+      return res.end();
+    }
+
     networkMetrics.requests += 1;
     const limitResult = pathname.startsWith("/api/") ? rateLimit(req, url, pathname) : null;
     if (limitResult && !limitResult.allowed) return jsonResponse(res, 429, { ok: false, error: `Забагато запитів. Повторіть через ${limitResult.retryAfter} с.`, retryAfterSeconds: limitResult.retryAfter }, rateHeaders(limitResult));
