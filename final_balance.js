@@ -190,14 +190,41 @@ function evaluateDirectOutcome(room, mysteryOutcome = null) {
     const value = raw * max / 100;
     return { label, key, raw: Math.round(raw), value, max, tone: tone(raw), kind: "decision" };
   });
-  const directScore = clamp(Math.round(scoreBreakdown.reduce((sum, item) => sum + item.value, 0)));
+  const hasFinalGroup = players.length > 0;
+  const directScore = hasFinalGroup
+    ? clamp(Math.round(scoreBreakdown.reduce((sum, item) => sum + item.value, 0)))
+    : 0;
+  if (!hasFinalGroup) {
+    metrics.medical = 0;
+    metrics.social = 0;
+    metrics.threatControl = 0;
+    metrics.competence = 0;
+    metrics.fit = 0;
+    metrics.selection = 0;
+    for (const item of scoreBreakdown) {
+      if (["medical", "social", "threatControl", "competence", "fit", "selection"].includes(item.key)) {
+        item.raw = 0;
+        item.value = 0;
+        item.tone = "bad";
+      }
+    }
+  }
   return {
+    hasFinalGroup,
     mode: room.settings?.setting === "detective" ? "detective" : room.settings?.mode || "classic",
     directScore,
     metrics: Object.fromEntries(Object.entries(metrics).map(([key, value]) => [key, Math.round(value)])),
     competence: { ...competence, labelsMissing: competence.missing.map((key) => CATEGORY_LABELS[key]) },
     scoreBreakdown: scoreBreakdown.map((item) => ({ ...item, value: Math.round(item.value), max: Math.round(item.max) })),
-    directConsequences: buildDirectConsequences(room, metrics, competence, mysteryOutcome)
+    directConsequences: hasFinalGroup
+      ? buildDirectConsequences(room, metrics, competence, mysteryOutcome)
+      : [{
+          category: "Склад групи",
+          title: "У сховищі не залишилося активних учасників",
+          detail: "Порожня фінальна група не може отримати групову перемогу або започаткувати поселення.",
+          impact: "negative",
+          value: 0
+        }]
   };
 }
 
