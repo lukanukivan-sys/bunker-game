@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { stopChildProcess, testServerEnv } = require("./test_support");
 
 const root = __dirname;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "shelter-stage18-"));
@@ -11,7 +12,7 @@ const port = 34123;
 const base = `http://127.0.0.1:${port}`;
 const child = spawn(process.execPath, [path.join(root, "server.js")], {
   cwd: root,
-  env: { ...process.env, PORT: String(port), HOST: "127.0.0.1", DATA_DIR: dataDir },
+  env: testServerEnv({ PORT: String(port), HOST: "127.0.0.1", DATA_DIR: dataDir }),
   stdio: ["ignore", "pipe", "pipe"]
 });
 let output = "";
@@ -78,8 +79,8 @@ async function action(session, actionName, extra = {}) {
 
     // An open long poll remains a heartbeat, so a player is not marked offline after 12 seconds.
     const heldRevision = awakened[0].payload.revision;
-    const heldPoll = getState(sessions[0], 13000, heldRevision);
-    await sleep(12200);
+    const heldPoll = getState(sessions[0], 1800, heldRevision);
+    await sleep(1200);
     const observerState = (await getState(sessions[11])).payload;
     const heldPlayerRow = observerState.players.find((player) => player.id === sessions[0].playerId);
     assert.equal(heldPlayerRow.connected, true, "long-poll heartbeat did not preserve online status");
@@ -122,8 +123,7 @@ async function action(session, actionName, extra = {}) {
 
     console.log(`✅ Stage 18 network/load tests passed (${sessions.length} clients, ${elapsed} ms wake-up)`);
   } finally {
-    child.kill("SIGTERM");
-    await sleep(250);
+    await stopChildProcess(child);
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
 })().catch((error) => {

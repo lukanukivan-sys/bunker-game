@@ -1,21 +1,96 @@
-<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Сховище 1.0.5 — кабінет</title><link rel="stylesheet" href="styles.css?v=1.0.5"></head>
-<body><div class="noise"></div><header class="topbar"><div><p class="eyebrow">Сховище · 1.0.5</p><h1>КАБІНЕТ</h1></div><div class="top-actions"><span id="manageAccountBadge" class="badge">Не авторизовано</span><a class="button ghost" href="index.html">До гри</a></div></header>
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Сховище 1.2.10 — кабінет</title>
+  <link rel="stylesheet" href="styles.css?v=1.2.10-ui6-stage5">
+</head>
+<body class="cinematic-v2">
+<div class="noise"></div>
+<header class="topbar">
+  <div><p class="eyebrow">Сховище · 1.2.10</p><h1>КАБІНЕТ</h1></div>
+  <div class="top-actions"><span id="manageAccountBadge" class="badge">Не авторизовано</span><a class="button ghost" href="index.html">До гри</a></div>
+</header>
 <main class="shell manage-shell">
-<section class="panel manage-hero"><div><p class="eyebrow">Локальна платформа</p><h2>Профілі, кампанії, набори та статистика</h2><p class="lead">Облікові записи зберігаються лише на цьому сервері. Редактор не змінює базові файли: авторський контент зберігається окремим набором, який можна експортувати.</p></div></section>
-<nav class="manage-tabs"><button data-tab="account" class="active">Профіль</button><button data-tab="campaigns">Кампанії</button><button data-tab="content">Контент</button><button data-tab="stats">Статистика</button></nav>
-<section id="tab-account" class="manage-tab active">
-<div id="authForms" class="home-grid">
-<form id="registerForm" class="panel form-card"><p class="eyebrow">Новий профіль</p><h3>Реєстрація</h3><label><span>Логін</span><input id="registerUsername" required minlength="3" maxlength="32"></label><label><span>Ім’я у грі</span><input id="registerDisplayName" required maxlength="32"></label><label><span>Пароль</span><input id="registerPassword" required minlength="6" type="password"></label><button class="button primary full">Створити профіль</button></form>
-<form id="loginForm" class="panel form-card"><p class="eyebrow">Наявний профіль</p><h3>Вхід</h3><label><span>Логін</span><input id="loginUsername" required></label><label><span>Пароль</span><input id="loginPassword" required type="password"></label><button class="button secondary full">Увійти</button></form>
-</div>
-<section id="profilePanel" class="panel hidden"><div class="section-title"><div><p class="eyebrow">Обліковий запис</p><h3 id="profileName"></h3></div><button id="logoutButton" class="button ghost">Вийти з профілю</button></div><div id="profileStats" class="final-metrics"></div></section>
-</section>
-<section id="tab-campaigns" class="manage-tab">
-<div class="manage-grid"><form id="campaignForm" class="panel form-card"><p class="eyebrow">Нова історія</p><h3>Створити кампанію</h3><label><span>Назва</span><input id="campaignName" required maxlength="80"></label><label><span>Сетинг</span><select id="campaignSetting"><option value="modern">Наші дні</option><option value="fantasy">Темне фентезі</option><option value="space">Далекий космос</option><option value="postapocalypse">Постапокаліпсис</option><option value="cyberpunk">Кіберпанк</option><option value="horror">Горор</option><option value="detective">Детектив</option></select></label><label><span>Опис</span><textarea id="campaignDescription" rows="4"></textarea></label><button class="button primary full">Створити</button></form><section class="panel"><p class="eyebrow">Ваші кампанії</p><div id="campaignList" class="manage-list"></div></section></div>
-</section>
-<section id="tab-content" class="manage-tab">
-<div class="manage-grid"><form id="packForm" class="panel form-card"><p class="eyebrow">Редактор набору</p><h3>Авторський контент</h3><input id="packId" type="hidden"><label><span>Назва набору</span><input id="packName" required maxlength="80"></label><label><span>Сетинг</span><select id="packSetting"><option value="all">Усі сетинги</option><option value="modern">Наші дні</option><option value="fantasy">Темне фентезі</option><option value="space">Далекий космос</option><option value="postapocalypse">Постапокаліпсис</option><option value="cyberpunk">Кіберпанк</option><option value="horror">Горор</option><option value="detective">Детектив</option></select></label><label><span>Категорія</span><select id="packCategory"><option value="professions">Професії</option><option value="skills">Навички</option><option value="origins">Походження</option><option value="health">Здоров’я</option><option value="items">Предмети</option><option value="secrets">Таємниці</option><option value="traits">Риси</option><option value="hobbies">Хобі</option><option value="phobias">Фобії</option><option value="anomalies">Аномалії</option><option value="relationships">Стосунки</option></select></label><label><span>Записи, по одному в рядку</span><textarea id="packEntries" rows="12" placeholder="Польовий лікар\nРемонтник дронів | odd\nНасправді три єноти | absurd"></textarea></label><label class="checkbox-line"><input id="packPublic" type="checkbox"><span>Доступний усім профілям цього сервера</span></label><div class="button-row"><button class="button primary" type="submit">Зберегти категорію</button><button id="newPackButton" class="button ghost" type="button">Новий набір</button></div><details><summary>Розширений JSON</summary><textarea id="packJson" rows="10" placeholder="Повний JSON набору для подій, сховищ чи експедицій"></textarea><button id="applyJsonButton" class="button secondary" type="button">Застосувати JSON</button></details></form>
-<section class="panel"><div class="section-title"><div><p class="eyebrow">Бібліотека</p><h3>Збережені набори</h3></div><label class="button ghost file-button">Імпорт JSON<input id="importPackFile" type="file" accept="application/json,.json"></label></div><div id="packList" class="manage-list"></div></section></div>
-</section>
-<section id="tab-stats" class="manage-tab"><section class="panel"><p class="eyebrow">Усі партії на цьому сервері</p><h3>Загальна статистика</h3><div id="globalStats" class="final-metrics"></div><div id="recentGames" class="manage-list"></div></section></section>
-</main><div id="toast" class="toast hidden"></div><script src="manage.js?v=1.0.5"></script></body></html>
+  <section class="panel manage-hero">
+    <div><p class="eyebrow">Локальна платформа</p><h2>Профілі, кампанії, набори та статистика</h2><p class="lead">Редактор не змінює базові файли. Авторський контент зберігається окремим набором, який можна аналізувати, експортувати та підключати до кімнати.</p></div>
+  </section>
+  <nav class="manage-tabs">
+    <button data-tab="account" class="active">Профіль</button><button data-tab="campaigns">Кампанії</button><button data-tab="content">Контент</button><button data-tab="stats">Статистика</button>
+  </nav>
+
+  <section id="tab-account" class="manage-tab active">
+    <div id="authForms" class="home-grid">
+      <form id="registerForm" class="panel form-card"><p class="eyebrow">Новий профіль</p><h3>Реєстрація</h3><label><span>Логін</span><input id="registerUsername" required minlength="3" maxlength="32"></label><label><span>Ім’я у грі</span><input id="registerDisplayName" required maxlength="32"></label><label><span>Пароль</span><input id="registerPassword" required minlength="10" autocomplete="new-password" type="password"></label><button class="button primary full">Створити профіль</button></form>
+      <form id="loginForm" class="panel form-card"><p class="eyebrow">Наявний профіль</p><h3>Вхід</h3><label><span>Логін</span><input id="loginUsername" required></label><label><span>Пароль</span><input id="loginPassword" required type="password"></label><button class="button secondary full">Увійти</button></form>
+      <form id="resetPasswordForm" class="panel form-card"><p class="eyebrow">Відновлення доступу</p><h3>Новий пароль</h3><label><span>Логін</span><input id="resetUsername" required></label><label><span>Резервний код</span><input id="resetRecoveryCode" class="recovery-code-input" required autocomplete="one-time-code"></label><label><span>Новий пароль</span><input id="resetNewPassword" required minlength="10" autocomplete="new-password" type="password"></label><button class="button ghost full">Скинути пароль</button></form>
+    </div>
+    <section id="recoveryCodePanel" class="panel hidden"><p class="eyebrow">Збережіть поза браузером</p><h3>Резервний код профілю</h3><p>Він показується лише після створення профілю або скидання пароля.</p><div class="button-row"><code id="recoveryCodeValue" class="recovery-code-display"></code><button id="copyRecoveryCode" class="button secondary" type="button">Копіювати</button><button id="hideRecoveryCode" class="button ghost" type="button">Сховати</button></div></section>
+    <section id="profilePanel" class="panel hidden"><div class="section-title"><div><p class="eyebrow">Обліковий запис</p><h3 id="profileName"></h3></div><button id="logoutButton" class="button ghost">Вийти з профілю</button></div><div id="profileStats" class="final-metrics"></div><details class="session-manager"><summary>Активні пристрої</summary><div id="sessionList" class="manage-list"></div></details></section>
+  </section>
+
+  <section id="tab-campaigns" class="manage-tab">
+    <div class="manage-grid">
+      <form id="campaignForm" class="panel form-card"><p class="eyebrow">Нова історія</p><h3>Створити кампанію</h3><label><span>Назва</span><input id="campaignName" required maxlength="80"></label><label><span>Сетинг</span><select id="campaignSetting"><option value="modern">Наші дні</option><option value="fantasy">Темне фентезі</option><option value="space">Далекий космос</option><option value="postapocalypse">Постапокаліпсис</option><option value="cyberpunk">Кіберпанк</option><option value="horror">Горор</option><option value="detective">Детектив</option></select></label><label><span>Опис</span><textarea id="campaignDescription" rows="4"></textarea></label><button class="button primary full">Створити</button></form>
+      <section class="panel"><p class="eyebrow">Ваші кампанії</p><div id="campaignList" class="manage-list"></div></section>
+    </div>
+  </section>
+
+  <section id="tab-content" class="manage-tab">
+    <section class="panel author-guide">
+      <div class="section-title"><div><p class="eyebrow">Швидкий старт</p><h3>Як зробити власний контент</h3></div><a class="button ghost" href="AUTHOR_CONTENT_GUIDE_UA.md" target="_blank">Повна інструкція</a></div>
+      <div class="author-steps">
+        <article><b>1. Створіть профіль</b><span>Набори прив’язуються до профілю на цьому сервері.</span></article>
+        <article><b>2. Додайте прості записи</b><span>Один рядок — один запис. Після риски: normal, odd або absurd.</span></article>
+        <article><b>3. Для складного контенту використайте JSON</b><span>Події, катастрофи, сховища й експедиції мають структуровані поля.</span></article>
+        <article><b>4. Запустіть аналіз</b><span>Виправте помилки; попередження можна залишити, якщо це свідоме рішення.</span></article>
+        <article><b>5. Збережіть і виберіть набір у кімнаті</b><span>Авторський контент додається до базового, а не замінює його.</span></article>
+      </div>
+      <details class="author-format-help"><summary>Формат простих рядків</summary><pre>Польовий лікар
+Ремонтник дронів | odd
+Насправді три єноти | absurd</pre><p><b>normal</b> — серйозний запис; <b>odd</b> — дивний; <b>absurd</b> — для «Повного хаосу».</p></details>
+    </section>
+
+    <div class="manage-grid content-editor-grid">
+      <form id="packForm" class="panel form-card">
+        <p class="eyebrow">Редактор набору</p><h3>Авторський контент</h3><input id="packId" type="hidden">
+        <label><span>Назва набору</span><input id="packName" required maxlength="80" placeholder="Наприклад: Карпатський повний хаос"></label>
+        <label><span>Короткий опис</span><textarea id="packDescription" rows="3" maxlength="300" placeholder="Що додає цей набір і для якого стилю гри він створений"></textarea></label>
+        <label><span>Сетинг</span><select id="packSetting"><option value="all">Усі сетинги</option><option value="modern">Наші дні</option><option value="fantasy">Темне фентезі</option><option value="space">Далекий космос</option><option value="postapocalypse">Постапокаліпсис</option><option value="cyberpunk">Кіберпанк</option><option value="horror">Горор</option><option value="detective">Детектив</option></select></label>
+        <label><span>Категорія простих записів</span><select id="packCategory"><option value="professions">Професії</option><option value="skills">Навички</option><option value="origins">Походження</option><option value="health">Здоров’я</option><option value="items">Предмети</option><option value="secrets">Таємниці</option><option value="traits">Риси</option><option value="hobbies">Хобі</option><option value="phobias">Фобії</option><option value="anomalies">Аномалії</option><option value="relationships">Стосунки</option></select></label>
+        <label><span>Записи, по одному в рядку</span><textarea id="packEntries" rows="12" placeholder="Польовий лікар&#10;Ремонтник дронів | odd&#10;Насправді три єноти | absurd"></textarea></label>
+        <label class="checkbox-line"><input id="packPublic" type="checkbox"><span>Доступний усім профілям цього сервера</span></label>
+        <div class="button-row"><button class="button primary" type="submit">Зберегти набір</button><button id="analyzePackButton" class="button secondary" type="button">Аналізувати</button><button id="newPackButton" class="button ghost" type="button">Новий набір</button></div>
+        <label class="compact-field"><span>Тестова генерація</span><select id="analysisSampleSize"><option value="10">10 персонажів</option><option value="25" selected>25 персонажів</option><option value="50">50 персонажів</option><option value="100">100 персонажів</option></select></label>
+        <details class="json-editor-block"><summary>Розширений JSON для подій, сховищ та експедицій</summary>
+          <div class="template-toolbar"><button class="button ghost" type="button" data-pack-template="event">Шаблон події</button><button class="button ghost" type="button" data-pack-template="expedition">Шаблон експедиції</button><button class="button ghost" type="button" data-pack-template="catastrophe">Шаблон катастрофи</button><button class="button ghost" type="button" data-pack-template="shelter">Шаблон сховища</button><button id="downloadPackTemplate" class="button ghost" type="button">Завантажити чистий шаблон</button></div>
+          <textarea id="packJson" rows="18" spellcheck="false" placeholder="Повний JSON набору"></textarea>
+          <button id="applyJsonButton" class="button secondary" type="button">Застосувати JSON до редактора</button>
+        </details>
+      </form>
+
+      <section class="panel"><div class="section-title"><div><p class="eyebrow">Бібліотека</p><h3>Збережені набори</h3></div><label class="button ghost file-button">Імпорт JSON<input id="importPackFile" type="file" accept="application/json,.json"></label></div><div id="packList" class="manage-list"></div></section>
+    </div>
+
+    <section id="analysisPanel" class="panel analyzer-panel hidden">
+      <div class="section-title"><div><p class="eyebrow">Автоматична перевірка</p><h3>Звіт якості й балансу</h3></div><span id="analysisScoreBadge" class="badge">—</span></div>
+      <div id="analysisSummary" class="final-metrics"></div>
+      <div class="analyzer-grid">
+        <section><h4>Помилки й рекомендації</h4><div id="analysisIssues" class="analysis-list"></div></section>
+        <section><h4>Попередній перегляд</h4><div id="analysisPreview" class="content-preview-grid"></div></section>
+      </div>
+      <div class="analyzer-grid">
+        <section><h4>Схожі записи</h4><div id="analysisDuplicates" class="analysis-list"></div></section>
+        <section><h4>Тестова генерація</h4><div id="analysisSimulation" class="simulation-report"></div></section>
+      </div>
+      <details><summary>Відомі теги експедицій</summary><div id="knownExpeditionTags" class="tag-cloud"></div></details>
+    </section>
+  </section>
+
+  <section id="tab-stats" class="manage-tab"><section class="panel"><p class="eyebrow">Усі партії на цьому сервері</p><h3>Загальна статистика</h3><div id="globalStats" class="final-metrics"></div><div id="recentGames" class="manage-list"></div></section></section>
+</main>
+<div id="toast" class="toast hidden"></div>
+<script src="manage.js?v=1.2.10"></script>
+</body>
+</html>

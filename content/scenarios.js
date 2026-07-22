@@ -1,5 +1,7 @@
 "use strict";
 
+const { random } = require("../lib/random");
+
 const SCALE_MODULES = [
   { id: "local", name: "Локальний", phrase: "один великий регіон", weight: 10, pressure: 0.92, collapse: "Окремі держави ще можуть існувати, але допомога не доходить через зруйновані коридори й боротьбу за контроль над безпечними зонами." },
   { id: "continental", name: "Континентальний", phrase: "цілий континент", weight: 26, pressure: 1.00, collapse: "Евакуаційні маршрути перетворилися на пастки, а сусідні країни закрили кордони й втратили зв’язок між собою." },
@@ -107,18 +109,36 @@ const DATA = {
 
 function weightedSample(items) {
   const total = items.reduce((sum, item) => sum + Number(item.weight || 1), 0);
-  let roll = Math.random() * total;
+  let roll = random() * total;
   for (const item of items) {
     roll -= Number(item.weight || 1);
     if (roll <= 0) return item;
   }
   return items[items.length - 1];
 }
-function sample(items) { return items[Math.floor(Math.random() * items.length)]; }
+function sample(items) { return items[Math.floor(random() * items.length)]; }
+function entryLevel(item) { return item?.level || "normal"; }
+function chooseByAbsurdity(items, absurdityLevel = 2) {
+  const level = Math.max(0, Math.min(4, Number(absurdityLevel) || 0));
+  const profiles = [
+    { normal: 1, odd: 0, absurd: 0 },
+    { normal: 0.86, odd: 0.14, absurd: 0 },
+    { normal: 0.70, odd: 0.24, absurd: 0.06 },
+    { normal: 0.48, odd: 0.34, absurd: 0.18 },
+    { normal: 0.30, odd: 0.43, absurd: 0.27 }
+  ];
+  const allowed = items.filter((item) => entryLevel(item) === "normal" || (entryLevel(item) === "odd" && level >= 1) || (entryLevel(item) === "absurd" && level >= 2));
+  if (!allowed.length) return sample(items);
+  const profile = profiles[level];
+  const roll = random();
+  const wanted = roll < profile.normal ? "normal" : roll < profile.normal + profile.odd ? "odd" : "absurd";
+  const candidates = allowed.filter((item) => entryLevel(item) === wanted);
+  return sample(candidates.length ? candidates : allowed);
+}
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
-function generate(settingId = "modern") {
+function generate(settingId = "modern", absurdityLevel = 2) {
   const setting = DATA[settingId] || DATA.modern;
-  const cause = sample(setting.causes);
+  const cause = chooseByAbsurdity(setting.causes, absurdityLevel);
   const scaleSource = setting.scales || SCALE_MODULES;
   const eligibleScales = scaleSource.filter((item) => !item.settings || item.settings.includes(settingId));
   const scale = weightedSample(eligibleScales);
@@ -159,6 +179,7 @@ function validate() {
     const causeIds = new Set();
     for (const cause of setting.causes) {
       if (!cause.id || !cause.title || !cause.summary || !cause.cause || !Array.isArray(cause.threats) || !cause.threats.length) throw new Error(`SCENARIOS.${settingId}: неповна причина.`);
+      if (cause.level && !["normal", "odd", "absurd"].includes(cause.level)) throw new Error(`SCENARIOS.${settingId}.${cause.id}: невідомий level ${cause.level}.`);
       if (causeIds.has(cause.id)) throw new Error(`SCENARIOS.${settingId}: дубль cause id ${cause.id}.`);
       causeIds.add(cause.id);
       for (const threatId of cause.threats) if (!setting.threats[threatId]) throw new Error(`SCENARIOS.${settingId}.${cause.id}: невідомий threat ${threatId}.`);

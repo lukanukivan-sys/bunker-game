@@ -1,5 +1,7 @@
 "use strict";
 
+const { random } = require("../lib/random");
+
 const ASPECTS = ["alibi", "motive", "access", "testimony", "evidenceLink"];
 
 const CASE_ABILITIES = {
@@ -216,11 +218,11 @@ const EVIDENCE_LINKS = [
   "Є непрямий доказ, який однаково підходить щонайменше двом учасникам."
 ];
 
-function sample(array) { return array[Math.floor(Math.random() * array.length)]; }
+function sample(array) { return array[Math.floor(random() * array.length)]; }
 function shuffled(array) {
   const result = [...array];
   for (let index = result.length - 1; index > 0; index -= 1) {
-    const other = Math.floor(Math.random() * (index + 1));
+    const other = Math.floor(random() * (index + 1));
     [result[index], result[other]] = [result[other], result[index]];
   }
   return result;
@@ -291,8 +293,8 @@ function statusDeckFor(caseBrief = {}, count = 1) {
 function buildTruthProfile(roleId) {
   const profile = Object.fromEntries(ASPECTS.map((aspect) => [aspect, "consistent"]));
   const order = shuffled(ASPECTS);
-  const contradictions = roleId === "culprit" ? 2 : roleId === "accomplice" ? 1 : (Math.random() < 0.42 ? 1 : 0);
-  const ambiguous = roleId === "culprit" ? 2 : roleId === "accomplice" ? 2 : 1 + (Math.random() < 0.45 ? 1 : 0);
+  const contradictions = roleId === "culprit" ? 2 : roleId === "accomplice" ? 1 : (random() < 0.42 ? 1 : 0);
+  const ambiguous = roleId === "culprit" ? 2 : roleId === "accomplice" ? 2 : 1 + (random() < 0.45 ? 1 : 0);
   order.slice(0, contradictions).forEach((aspect) => { profile[aspect] = "contradiction"; });
   order.slice(contradictions, contradictions + ambiguous).forEach((aspect) => { if (profile[aspect] === "consistent") profile[aspect] = "ambiguous"; });
   return profile;

@@ -7,23 +7,43 @@ const os = require("os");
 const crypto = require("crypto");
 const { COMMON, SETTINGS, RELATIONSHIPS, EVENTS, EXPEDITIONS, MEDICAL, LORE, SCENARIOS, SETTING_RULES } = require("./content");
 const { simulateLongTerm } = require("./final_simulation");
+const { evaluateDirectOutcome } = require("./final_balance");
 const { createPlatform } = require("./platform");
 const { describeCharacteristic } = require("./content/character_descriptions");
 const DETECTIVE_CASE = require("./content/detective_case");
 const { buildScenarioPriorities, validatePriorities } = require("./content/scenario_priorities");
-
-const VERSION = "1.0.5";
+const { buildCampaignLegacy, balancedStartingEffects } = require("./content/campaign_legacy");
+const { PRODUCT_VERSION: VERSION, ROOM_SCHEMA, GENERATION_SCHEMA, CONTENT_SCHEMA, PLATFORM_SCHEMA } = require("./config/version");
+const { random, runWithSeed } = require("./lib/random");
+const { securityHeaders } = require("./lib/security");
+const { createRoomStore } = require("./lib/room_store");
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
 const PUBLIC_DIR = path.join(__dirname, "public");
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
-const SAVE_FILE = path.join(DATA_DIR, "rooms_v105.json");
+const LEGACY_SAVE_FILES = [path.join(DATA_DIR, "rooms_v105.json")];
+const ROOM_TTL_MS = clampRoomTtl(process.env.ROOM_TTL_DAYS);
 const platform = createPlatform(__dirname, DATA_DIR);
 const startedAt = Date.now();
+const IS_TEST_RUNTIME = process.env.NODE_ENV === "test";
+const MIN_AUTOMATION_TIMEOUT_SECONDS = IS_TEST_RUNTIME ? 1 : 5;
+const MIN_HOST_FAILOVER_SECONDS = IS_TEST_RUNTIME ? 1 : 15;
+const AUTOMATION_TICK_MS = IS_TEST_RUNTIME ? 100 : 1000;
+const AUTO_ADVANCE_DELAY_MS = IS_TEST_RUNTIME ? 120 : 1200;
+const AUTO_EVENT_DELAY_MS = IS_TEST_RUNTIME ? 180 : 1800;
+const AUTO_PHASE_DELAY_MS = IS_TEST_RUNTIME ? 80 : 800;
 const requestBuckets = new Map();
 const roomStateWaiters = new Map();
 const networkMetrics = { requests: 0, limited: 0, stateRequests: 0, longPolls: 0, longPollTimeouts: 0, longPollWakeups: 0 };
 const rooms = new Map();
+const roomStore = createRoomStore({
+  dataDir: DATA_DIR,
+  schema: ROOM_SCHEMA,
+  productVersion: VERSION,
+  ttlMs: ROOM_TTL_MS,
+  getRooms: () => rooms.values(),
+  legacyFiles: LEGACY_SAVE_FILES
+});
 const SKIP_VOTE = "__skip__";
 const VOTE_SYSTEMS = new Set(["exile", "tribunal"]);
 const VOTE_VISIBILITIES = new Set(["secret", "open"]);
@@ -32,6 +52,11 @@ const AUTOMATION_MODES = new Set(["off", "assist", "auto"]);
 const SCENARIO_MODES = new Set(["procedural", "catalog"]);
 const SETTING_IDS = new Set(Object.keys(SETTINGS));
 const SANCTION_LABELS = { exile: "Вигнання", detention: "Ізоляція на раунд", silence: "Позбавлення голосу", skip: "Без санкцій" };
+function clampRoomTtl(value) {
+  const days = Math.max(1, Math.min(365, Number(value) || 30));
+  return days * 24 * 60 * 60 * 1000;
+}
+
 function normalizeTieRule(value) {
   return value === "no_action" ? "no_action" : "runoff";
 }
@@ -41,8 +66,8 @@ function normalizeAutomationMode(value) {
 function normalizeAutomationSettings(settings = {}) {
   return {
     mode: normalizeAutomationMode(settings.automationMode),
-    inactivitySeconds: clamp(Number(settings.inactivityTimeoutSeconds) || 90, 5, 600),
-    phaseSeconds: clamp(Number(settings.phaseTimeoutSeconds) || 180, 5, 1800)
+    inactivitySeconds: clamp(Number(settings.inactivityTimeoutSeconds) || 90, MIN_AUTOMATION_TIMEOUT_SECONDS, 600),
+    phaseSeconds: clamp(Number(settings.phaseTimeoutSeconds) || 180, MIN_AUTOMATION_TIMEOUT_SECONDS, 1800)
   };
 }
 const OUTSIDE_ROLES = [
@@ -219,26 +244,22 @@ function resolveOutsideProposal(room, proposal, accepted, reason = "") {
   return proposal;
 }
 function voteOutsideProposal(room, player, body) {
-  if (!room.game || !isSocialPhase(room.game.phase)) throw new Error("Голосування за зовнішню угоду доступне лише під час соціальної фази.");
-  if (!player.active || isDetained(room, player) || isSilenced(room, player)) throw new Error("Ви не можете голосувати за зовнішню угоду.");
+  if (!room.game || !isSocialPhase(room.game.phase)) throw new Error("Рішення щодо зовнішньої угоди доступне лише під час соціальної фази.");
+  if (player.id !== room.hostPlayerId) throw new Error("Зовнішню угоду схвалює або відхиляє хост як окреме ресурсне рішення, без другого загального голосування.");
+  if (!canParticipateInDecision(room, player, "outside_deal")) throw new Error("Зараз ви не можете ухвалити це рішення.");
   const proposal = currentOutsideProposal(room);
   if (!proposal) throw new Error("Активної зовнішньої угоди немає.");
   const choice = body.choice === "accept" ? "accept" : body.choice === "reject" ? "reject" : null;
   if (!choice) throw new Error("Оберіть схвалити або відхилити угоду.");
-  proposal.votes[player.id] = choice;
-  const voters = eligibleVoters(room);
-  const yes = voters.filter((voter) => proposal.votes[voter.id] === "accept").length;
-  const no = voters.filter((voter) => proposal.votes[voter.id] === "reject").length;
-  const required = Math.floor(voters.length / 2) + 1;
-  if (yes >= required) resolveOutsideProposal(room, proposal, true);
-  else if (no >= required || voters.every((voter) => proposal.votes[voter.id])) resolveOutsideProposal(room, proposal, false);
+  proposal.votes = { [player.id]: choice };
+  resolveOutsideProposal(room, proposal, choice === "accept");
 }
 function outsideCampPublic(room, requester) {
   if (!room.game?.features?.outsidePlay) return null;
   const camp = ensureOutsideCamp(room);
   const members = outsideCampMembers(room);
   const proposal = currentOutsideProposal(room) || [...camp.proposals].reverse()[0] || null;
-  const voters = eligibleVoters(room);
+  const voters = eligibleVoters(room, "outside_deal");
   const yes = proposal ? voters.filter((voter) => proposal.votes?.[voter.id] === "accept").length : 0;
   const no = proposal ? voters.filter((voter) => proposal.votes?.[voter.id] === "reject").length : 0;
   return {
@@ -268,16 +289,16 @@ function outsideCampPublic(room, requester) {
       result: proposal.result || null,
       yes,
       no,
-      required: Math.floor(voters.length / 2) + 1,
+      required: 1,
       myVote: proposal.votes?.[requester.id] || null,
-      canVote: proposal.status === "pending" && requester.active && !isDetained(room, requester) && !isSilenced(room, requester) && isSocialPhase(room.game.phase)
+      canVote: proposal.status === "pending" && requester.id === room.hostPlayerId && canParticipateInDecision(room, requester, "outside_deal") && isSocialPhase(room.game.phase)
     } : null
   };
 }
 function useLegacyOutsideRoleAction(room, player, body, role) {
   if (role.id === "scout") {
     const candidates = eventPool(room);
-    room.game.preparedEvent ||= JSON.parse(JSON.stringify(sample(candidates)));
+    room.game.preparedEvent ||= JSON.parse(JSON.stringify(chooseContentEntry(candidates, room.settings.absurdity)));
     player.character.privateNotes.push(`Розвідка: наступна подія — «${room.game.preparedEvent.title}». ${room.game.preparedEvent.description}`);
     room.game.log.push("Зовнішній розвідник передав зашифроване попередження про майбутню загрозу.");
   } else if (role.id === "courier") {
@@ -315,7 +336,7 @@ function useOutsideCampAction(room, player, body) {
   if (actionId === "scavenge") {
     const resource = ["food", "water", "energy", "medicine", "scrap"].includes(body.resource) ? body.resource : "food";
     const chance = clamp(0.62 + bonus + camp.exploration * 0.001 - camp.threat * 0.003, 0.20, 0.92);
-    const roll = Math.random();
+    const roll = random();
     success = roll <= chance;
     if (success) {
       const amount = resource === "medicine" ? randomInt(2, 5) : resource === "energy" ? randomInt(3, 7) : randomInt(4, 9);
@@ -325,7 +346,7 @@ function useOutsideCampAction(room, player, body) {
     } else {
       camp.threat = clamp(camp.threat + 6, 0, 100);
       player.character.stress = clamp((player.character.stress || 0) + 1, 0, 5);
-      if (Math.random() < 0.28) player.character.injury = clamp((player.character.injury || 0) + 1, 0, 5);
+      if (random() < 0.28) player.character.injury = clamp((player.character.injury || 0) + 1, 0, 5);
       text = `${player.name} повернувся / повернулася без припасів; загроза навколо табору зросла.`;
     }
   } else if (actionId === "fortify") {
@@ -337,7 +358,7 @@ function useOutsideCampAction(room, player, body) {
     text = `${player.name} укріпив / укріпила табір: укриття +9, загроза −6.`;
   } else if (actionId === "explore") {
     const chance = clamp(0.58 + bonus + camp.shelter * 0.001 - camp.threat * 0.002, 0.22, 0.92);
-    success = Math.random() <= chance;
+    success = random() <= chance;
     if (success) {
       const progress = randomInt(8, 14);
       camp.exploration = clamp(camp.exploration + progress, 0, 100);
@@ -546,7 +567,7 @@ const GAME_MODES = {
   factions: {
     id: "factions", name: "Фракції та зрадники",
     description: "Соціальна дедукція: розкриття, переговори, таємні рольові дії та рішення громади. Ресурсні операції не відволікають від інтриг.",
-    hiddenRoles: true, elimination: true, operations: false, treatment: false, itemTrade: true, personalGoals: true, abilities: true, outsidePlay: true, endWhenCapacityReached: false
+    hiddenRoles: true, elimination: true, operations: false, treatment: false, itemTrade: true, personalGoals: true, abilities: true, outsidePlay: false, endWhenCapacityReached: false
   },
   advanced: {
     id: "advanced", name: "Розширена гра",
@@ -555,7 +576,7 @@ const GAME_MODES = {
   }
 };
 const ADVANCED_MODULE_LIMIT = 2;
-const DEFAULT_ADVANCED_MODULES = ["operations", "roles"];
+const DEFAULT_ADVANCED_MODULES = ["operations"];
 const ADVANCED_MODULES = {
   operations: { id: "operations", name: "Експедиції та ремонт", description: "Додає окрему фазу операцій, експедиції й плановий ремонт.", features: { operations: true } },
   medicine: { id: "medicine", name: "Медицина", description: "Додає лікування, медичні витрати й догляд під час фази операцій.", features: { treatment: true } },
@@ -570,10 +591,22 @@ function normalizeAdvancedModules(value, mode = "advanced", setting = "modern") 
   for (const raw of source) {
     const id = String(raw || "");
     if (!ADVANCED_MODULES[id] || result.includes(id)) continue;
+    // Приховані фракції та повноцінна гра вигнанців створюють дві паралельні
+    // соціальні гри, тому сервер не дозволяє ввімкнути їх одночасно.
+    if ((id === "outside" && result.includes("roles")) || (id === "roles" && result.includes("outside"))) continue;
     result.push(id);
     if (result.length >= ADVANCED_MODULE_LIMIT) break;
   }
   return result;
+}
+function applyConfigurationSafety(settings) {
+  const mode = modeConfig(settings);
+  if (settings.setting === "detective" || mode.hiddenRoles) settings.voteVisibility = "secret";
+  const modules = normalizeAdvancedModules(settings.advancedModules, settings.mode, settings.setting);
+  settings.advancedModules = modules;
+  const complexAutoHost = settings.setting === "detective" || settings.mode === "factions" || settings.mode === "advanced" || modules.length > 0 || settings.voteSystem === "tribunal";
+  if (normalizeAutomationMode(settings.automationMode) === "auto" && complexAutoHost) settings.automationMode = "assist";
+  return settings;
 }
 function advancedModuleSummary(settingsOrRoom) {
   const settings = settingsOrRoom?.settings || settingsOrRoom || {};
@@ -599,8 +632,116 @@ const MODE_PHASE_LOOPS = {
   factions: ["reveal", "negotiation", "intrigue", "elimination", "round_end"]
 };
 const DETECTIVE_PHASE_LOOP = ["reveal", "investigation", "event", "elimination", "round_end"];
+const TUTORIAL_PHASE_LOOPS = {
+  1: ["reveal", "discussion", "event", "round_end"],
+  2: ["reveal", "discussion", "event", "elimination", "round_end"]
+};
+const TUTORIAL_CATASTROPHE = {
+  id: "tutorial_infrastructure_collapse",
+  title: "Ланцюговий колапс інфраструктури",
+  description: "Після серії масштабних відключень міста втратили електрику, воду, зв’язок і централізоване постачання. Навчальна група має стабілізувати невелике сховище та навчитися ухвалювати спільні рішення.",
+  threat: "Холод, забруднене повітря й нестача базових ресурсів",
+  procedural: false,
+  modules: null,
+  pressure: 1,
+  startingEffects: {},
+  hiddenComplication: null,
+  complicationRevealRound: null,
+  lore: {
+    cause: "Каскадна аварія енергомережі зупинила насосні станції, транспорт і системи зв’язку.",
+    collapse: "За кілька днів локальні запаси вичерпалися, а міські служби втратили можливість координувати допомогу.",
+    surface: "Поверхня частково придатна для коротких виходів, але погода, дим і нестабільні будівлі залишаються небезпечними.",
+    horizon: "Перші тижні визначать, чи зможе громада перейти від аварійного виживання до стабільного поселення."
+  }
+};
+const TUTORIAL_SHELTER = {
+  title: "Навчальне сховище №7",
+  description: "Компактний цивільний комплекс із простими системами, на яких легко побачити наслідки кожного рішення.",
+  areaM2: 360,
+  rooms: [
+    { name: "Спальна кімната", count: 2, description: "Двоярусні ліжка й мінімальний особистий простір." },
+    { name: "Технічна кімната", count: 1, description: "Генератор, щитова та інструменти." },
+    { name: "Медпункт", count: 1, description: "Базовий набір першої допомоги." },
+    { name: "Склад", count: 1, description: "Їжа, вода й витратні матеріали." }
+  ],
+  provisions: [
+    { name: "Сухі пайки", quantity: 24, unit: "компл." },
+    { name: "Питна вода", quantity: 48, unit: "л" },
+    { name: "Аптечки", quantity: 4, unit: "шт." },
+    { name: "Паливні каністри", quantity: 5, unit: "шт." }
+  ],
+  initialResources: { food: 72, water: 74, energy: 66, integrity: 70, medicine: 58, morale: 68 },
+  modules: ["Вентиляція", "Генератор", "Водний контур", "Склад", "Медпункт", "Шлюз"]
+};
+const TUTORIAL_EVENTS = {
+  1: {
+    id: "tutorial_filters",
+    title: "Перевантаження вентиляції",
+    description: "Фільтри швидко забиваються пилом. Група має обрати між безпечним, швидким і ризикованим рішенням.",
+    choices: [
+      { id: "economy", label: "Перевести вентиляцію в ощадливий режим", success: 0.82, good: { energy: -4, integrity: 4, morale: 2 }, bad: { medicine: -4, morale: -3 }, goodText: "Навантаження знизилося, і команда виграла час для планового обслуговування.", badText: "Потік повітря виявився надто слабким, кільком людям стало зле." },
+      { id: "repair", label: "Негайно розібрати й очистити фільтри", success: 0.62, good: { integrity: 8, energy: -6 }, bad: { integrity: -7, medicine: -5 }, goodText: "Фільтри повністю очищено, вентиляція працює стабільніше.", badText: "Під час поспішного ремонту пошкоджено кріплення й піднято хмару пилу." },
+      { id: "ignore", label: "Почекати й не витрачати ресурси", success: 0.34, good: { energy: 2 }, bad: { medicine: -8, morale: -6 }, goodText: "Система несподівано стабілізувалася після зменшення зовнішнього пилу.", badText: "Якість повітря різко погіршилася, і група втратила медичні запаси." }
+    ]
+  },
+  2: {
+    id: "tutorial_water",
+    title: "Домішки у водному контурі",
+    description: "Датчики виявили забруднення резервуара. Тепер важливо врахувати не лише шанс, а й ціну успіху та провалу.",
+    choices: [
+      { id: "boil", label: "Кип’ятити воду малими партіями", success: 0.78, good: { water: -4, energy: -7, morale: 2 }, bad: { water: -10, energy: -8 }, goodText: "Група зберегла більшість запасу й отримала безпечну воду.", badText: "Частину води втрачено через помилку температурного режиму." },
+      { id: "flush", label: "Повністю промити контур", success: 0.58, good: { water: -8, integrity: 7 }, bad: { water: -16, integrity: -5 }, goodText: "Контур очищено, а зношені з’єднання одночасно замінено.", badText: "Промивання спричинило протікання й значну втрату води." },
+      { id: "tablets", label: "Використати медичні знезаражувальні засоби", success: 0.9, good: { medicine: -7, morale: 3 }, bad: { medicine: -10, morale: -2 }, goodText: "Воду швидко знезаражено без втрати основного запасу.", badText: "Дозування виявилося невдалим, довелося витратити додаткові препарати." }
+    ]
+  }
+};
+const TUTORIAL_GUIDE_STEPS = [
+  { round: 1, phase: "reveal", title: "1. Познайомтеся зі своєю карткою", text: "Відкрийте вкладку «Мій персонаж». Гра запропонує дві категорії — виберіть одну й відкрийте її групі.", targetTab: "character", button: "Відкрити картку" },
+  { round: 1, phase: "discussion", title: "2. Порівняйте відкриті факти", text: "Перейдіть до вкладок «Група» та «Сховище». Обговоріть, які відкриті характеристики допомагають саме за цієї катастрофи.", targetTab: "group", button: "Переглянути групу" },
+  { round: 1, phase: "event", title: "3. Ухваліть перше спільне рішення", text: "Оберіть варіант кризи. До підрахунку показується якісна оцінка ризику, а після — точний шанс, кидок і всі причини результату.", targetTab: "turn", button: "Перейти до кризи" },
+  { round: 1, phase: "round_end", title: "4. Розберіть наслідки", text: "Перший раунд навмисно завершується без санкцій. Перегляньте журнал причин і зміни ресурсів, а потім переходьте до другого раунду.", targetTab: "log", button: "Відкрити журнал" },
+  { round: 2, phase: "reveal", title: "5. Додайте нову інформацію", text: "Відкрийте ще одну характеристику. Зверніть увагу, як нові факти можуть змінити попередню оцінку персонажа.", targetTab: "character", button: "Відкрити картку" },
+  { round: 2, phase: "discussion", title: "6. Підготуйте аргументи", text: "Зіставте потреби сховища, відкриті характеристики й наслідки першого раунду. Формулюйте аргументи через користь і ризики, а не лише через симпатії.", targetTab: "group", button: "Порівняти учасників" },
+  { round: 2, phase: "event", title: "7. Перевірте ціну рішення", text: "У другій кризі порівнюйте не тільки шанс успіху, а й ресурси, які витратить або втратить громада.", targetTab: "turn", button: "Перейти до кризи" },
+  { round: 2, phase: "elimination", title: "8. Проведіть рішення громади", text: "Подайте відкритий голос за санкцію або «Без санкцій». Протокол пояснить вагу голосів, нічию та остаточний наслідок.", targetTab: "turn", button: "Відкрити голосування" },
+  { round: 2, phase: "round_end", title: "9. Завершіть навчальну партію", text: "Перевірте останні наслідки й завершіть раунд. Фінал окремо покаже результат громади та долю кожного персонажа.", targetTab: "log", button: "Переглянути підсумок" },
+  { round: 2, phase: "final", title: "Навчання завершено", text: "Ви пройшли повний базовий цикл: картка, розкриття, обговорення, криза, пояснення шансів, голосування та фінал.", targetTab: "turn", button: "Навчання завершено" }
+];
+function tutorialEnabled(settingsOrRoom) {
+  const settings = settingsOrRoom?.settings || settingsOrRoom || {};
+  return settings.tutorialEnabled === true;
+}
+function applyTutorialPreset(settings, playerCount = 0) {
+  settings.tutorialEnabled = settings.tutorialEnabled === true;
+  if (!settings.tutorialEnabled) return settings;
+  const players = Math.max(0, Number(playerCount || 0));
+  settings.mode = "classic";
+  settings.setting = "modern";
+  settings.scenarioMode = "catalog";
+  settings.rounds = 2;
+  settings.revealsPerRound = 1;
+  settings.characterSetMode = "compact";
+  settings.customCharacterKeys = [];
+  settings.demographicsEnabled = false;
+  settings.voteSystem = "tribunal";
+  settings.voteVisibility = "open";
+  settings.tieRule = "runoff";
+  settings.automationMode = "off";
+  settings.advancedModules = [];
+  settings.hiddenRoles = false;
+  settings.absurdity = 1;
+  settings.contentPackId = null;
+  settings.campaignId = null;
+  if (players >= 3) settings.capacity = Math.max(2, Math.min(10, players - 1));
+  else settings.capacity = 2;
+  return settings;
+}
 function phaseLoopFor(settingsOrRoom) {
   const settings = settingsOrRoom?.settings || settingsOrRoom || {};
+  if (settings.tutorialEnabled === true) {
+    const round = Number(settingsOrRoom?.game?.round || 2);
+    return [...(round <= 1 ? TUTORIAL_PHASE_LOOPS[1] : TUTORIAL_PHASE_LOOPS[2])];
+  }
   if (settings.setting === "detective") return [...DETECTIVE_PHASE_LOOP];
   if (settings.mode === "advanced") {
     const features = modeConfig(settings);
@@ -804,7 +945,7 @@ function abilityAllowedForMode(ability, mode) {
 }
 
 const BASE_CHARACTER_KEYS = [
-  "origin", "demographicContext", "anomaly", "age", "profession", "health", "skill",
+  "origin", "demographicContext", "attitudeToChildren", "anomaly", "age", "profession", "health", "skill",
   "trait", "item", "hobby", "phobia", "secret", "relationship"
 ];
 const DETECTIVE_CHARACTER_KEYS = [
@@ -822,7 +963,8 @@ const DETECTIVE_COMPACT_CHARACTER_KEYS = [
 
 const KEY_LABELS = {
   origin: "Походження / вид",
-  demographicContext: "Демографічні обставини",
+  demographicContext: "Стать та ідентичність",
+  attitudeToChildren: "Ставлення до дітей",
   anomaly: "Аномалія",
   age: "Вік",
   profession: "Професія",
@@ -858,7 +1000,7 @@ const DETECTIVE_KEY_LABELS = {
 };
 function characterKeysForSetting(settingId, demographicsEnabled = true) {
   if (settingId === "detective") return DETECTIVE_CHARACTER_KEYS;
-  return demographicsEnabled === false ? BASE_CHARACTER_KEYS.filter((key) => key !== "demographicContext") : BASE_CHARACTER_KEYS;
+  return demographicsEnabled === false ? BASE_CHARACTER_KEYS.filter((key) => !["demographicContext", "attitudeToChildren"].includes(key)) : BASE_CHARACTER_KEYS;
 }
 function normalizeCharacterSet(mode, customKeys, settingId, demographicsEnabled = true) {
   const available = characterKeysForSetting(settingId, demographicsEnabled);
@@ -892,7 +1034,7 @@ function characterKeyLabel(room, key) {
 
 
 const STRATEGIC_REVEAL_SENSITIVE_KEYS = new Set([
-  "health", "phobia", "secret", "relationship", "anomaly", "demographicContext",
+  "health", "phobia", "secret", "relationship", "anomaly", "demographicContext", "attitudeToChildren",
   "alibi", "motive", "testimony", "evidenceLink"
 ]);
 const REVEAL_RESOURCE_FOCUS = {
@@ -1052,7 +1194,7 @@ function processStrategicReveal(room, player, key) {
 function requestRevealCategory(room, player, body) {
   if (!room.game || !isSocialPhase(room.game.phase)) throw new Error("Запити характеристик доступні під час спільного обговорення.");
   if (!strategicRevealEnabled(room)) throw new Error("У цьому режимі стратегічні запити не використовуються.");
-  if (!player.active || isDetained(room, player)) throw new Error("Зараз ви не можете створити запит.");
+  if (!canParticipateInDecision(room, player, "request")) throw new Error("Зараз ви не можете створити запит.");
   if (room.game.round >= room.game.maxRounds) throw new Error("Наступного раунду вже не буде.");
   if (Number(player.character.revealInfluence || 0) < 1) throw new Error("Для запиту потрібен 1 вплив.");
   if (player.character.revealRequestUsedRound === room.game.round) throw new Error("У цьому раунді ви вже створили запит.");
@@ -1078,6 +1220,7 @@ function roundToFive(value) {
 }
 function estimateConfigurationDuration(settingsOrRoom, playerCount) {
   const settings = settingsOrRoom?.settings || settingsOrRoom || {};
+  if (settings.tutorialEnabled === true) return { min: 20, max: 35, label: "Навчальна", text: "20–35 хв" };
   const players = clamp(Number(playerCount) || 4, 4, 12);
   const rounds = clamp(Number(settings.rounds) || 4, 2, 7);
   const labels = publicPhaseLoop(settings).map((item) => item.label);
@@ -1102,23 +1245,27 @@ function estimateConfigurationDuration(settingsOrRoom, playerCount) {
   return { min, max, label, text: `${min}–${max} хв` };
 }
 function analyzeRoomConfiguration(settingsOrRoom, playerCount) {
-  const settings = settingsOrRoom?.settings || settingsOrRoom || {};
+  const sourceSettings = settingsOrRoom?.settings || settingsOrRoom || {};
+  const settings = applyTutorialPreset({ ...sourceSettings, advancedModules: [...(sourceSettings.advancedModules || [])], customCharacterKeys: [...(sourceSettings.customCharacterKeys || [])] }, playerCount);
   const players = clamp(Number(playerCount) || 1, 1, 12);
   const mode = modeConfig(settings);
   const modules = normalizeAdvancedModules(settings.advancedModules, settings.mode, settings.setting);
   const set = normalizeCharacterSet(settings.characterSetMode, settings.customCharacterKeys, settings.setting, settings.demographicsEnabled !== false);
   const rounds = clamp(Number(settings.rounds) || 4, 2, 7);
   const reveals = clamp(Number(settings.revealsPerRound) || 2, 1, 4);
-  const capacity = clamp(Number(settings.capacity) || 3, 2, 10);
+  const capacity = clamp(Number(settings.capacity) || (settings.soloTestMode === true ? 1 : 3), settings.soloTestMode === true ? 1 : 2, 10);
   const maxRevealed = Math.min(set.keys.length, rounds * reveals);
   const revealCoverage = set.keys.length ? Math.round((maxRevealed / set.keys.length) * 100) : 0;
   const fullRevealRound = Math.ceil(set.keys.length / reveals);
   const hiddenRoles = settings.setting === "detective" || mode.hiddenRoles;
   const issues = [];
   const add = (severity, title, text, code) => issues.push({ severity, title, text, code });
-  if (players < 4) add("error", "Замало гравців", "Для старту потрібно щонайменше 4 учасники.", "players_min");
+  const minimumPlayers = settings.soloTestMode === true ? 1 : (settings.tutorialEnabled === true ? 3 : 4);
+  if (settings.soloTestMode === true) add("info", "Соло-тестування", "Режим розробника дозволяє запуск із одним гравцем.", "solo_test");
+  if (players < minimumPlayers) add("error", "Замало гравців", `Для ${settings.tutorialEnabled === true ? "навчальної" : "звичайної"} партії потрібно щонайменше ${minimumPlayers} учасники.`, "players_min");
+  if (settings.tutorialEnabled === true) add("info", "Навчальний сценарій", "Гра автоматично використовує 2 раунди, стислий набір, відкриті голоси й безпечний перший раунд без санкцій.", "tutorial_mode");
   const exilesNeeded = mode.elimination ? Math.max(0, players - capacity) : 0;
-  if (mode.elimination && capacity >= players) add("error", "Місткість не створює відбору", `Місць (${capacity}) має бути менше, ніж гравців (${players}).`, "capacity");
+  if (mode.elimination && capacity >= players && settings.soloTestMode !== true) add("error", "Місткість не створює відбору", `Місць (${capacity}) має бути менше, ніж гравців (${players}).`, "capacity");
   if (mode.elimination && exilesNeeded > rounds) add("warning", settings.mode === "classic" ? "Відбір не встигне досягти місткості" : "Фінальна група може лишитися переповненою", `Для місткості ${capacity} потрібно ${exilesNeeded} вигнань, а раундів лише ${rounds}. Партія завершиться за лімітом раундів, навіть якщо активних людей буде більше.`, "selection_pressure");
   else if (mode.elimination && exilesNeeded === rounds && exilesNeeded > 0) add("warning", "Немає запасу на нічию", "Щоб досягти місткості, у кожному раунді має відбутися результативне вигнання.", "selection_margin");
   if (revealCoverage < 50) add("warning", "Більшість картки залишиться прихованою", `За партію можна відкрити лише ${maxRevealed} із ${set.keys.length} характеристик (${revealCoverage}%).`, "reveal_low");
@@ -1128,8 +1275,14 @@ function analyzeRoomConfiguration(settingsOrRoom, playerCount) {
   if (hiddenRoles && settings.voteVisibility === "open") add("warning", "Відкриті голоси послаблюють дедукцію", "За прихованих ролей відкриті голоси швидко формують безпечні коаліції та спрощують читання фракцій.", "open_hidden_roles");
   if (mode.elimination && normalizeTieRule(settings.tieRule) === "no_action") add("info", "Нічия одразу скасовує санкцію", "За цього правила переголосування не проводиться. Рекомендований варіант — повторне голосування між лідерами.", "tie_without_runoff");
   if (settings.mode === "advanced" && modules.includes("outside") && rounds < 3) add("warning", "Гра вигнанців майже не встигне розкритися", "Для зовнішніх ролей бажано щонайменше 3 раунди.", "outside_short");
+  const requestedModules = Array.isArray(sourceSettings.advancedModules) ? sourceSettings.advancedModules.map(String) : [];
+  if (requestedModules.includes("roles") && requestedModules.includes("outside")) add("error", "Несумісні модулі", "Фракції та зовнішній табір не можна запускати одночасно: вигнання має залишатися основною ставкою соціального конфлікту.", "roles_outside_conflict");
+  if (modules.includes("roles") && modules.includes("operations")) add("warning", "Два конкуруючі цикли", "Приховані дії та ресурсні операції подовжують раунд. Використовуйте цю комбінацію лише з досвідченою групою.", "roles_operations_load");
+  if (modules.includes("medicine") && !modules.includes("operations")) add("info", "Медицина створює фазу операцій", "Лікування буде єдиною основною дією операційної фази.", "medicine_phase");
   const automation = normalizeAutomationSettings(settings);
-  if (automation.mode === "auto" && automation.phaseSeconds < 60) add("warning", "Автоматичні фази надто короткі", `Ліміт ${automation.phaseSeconds} с може не залишити часу на обговорення.`, "automation_short");
+  const fullAutoAllowed = settings.mode === "classic" && settings.setting !== "detective" && settings.voteSystem !== "tribunal" && modules.length === 0;
+  if (automation.mode === "auto" && !fullAutoAllowed) add("warning", "Повний автохост обмежено", "Для складних режимів сервер використовуватиме режим помічника: він підкаже наступну дію, але не вирішуватиме соціальні дилеми замість групи.", "automation_complex");
+  else if (automation.mode === "auto" && automation.phaseSeconds < 60) add("warning", "Автоматичні фази надто короткі", `Ліміт ${automation.phaseSeconds} с може не залишити часу на обговорення.`, "automation_short");
   else if (automation.mode !== "off") add("info", "Захист від простою ввімкнено", `${automation.mode === "auto" ? "Автоматичний ведучий" : "Допоміжний режим"}: відсутність ${automation.inactivitySeconds} с, ліміт фази ${automation.phaseSeconds} с.`, "automation_enabled");
   if (players >= 10 && set.keys.length >= 12) add("warning", "Високе інформаційне навантаження", `Групі доведеться відстежувати до ${players * set.keys.length} фактів про персонажів.`, "memory_load");
   const duration = estimateConfigurationDuration(settings, players);
@@ -1223,6 +1376,181 @@ const HIDDEN_ROLES = {
   }
 };
 
+function normalizeGenerationSeed(value) {
+  return String(value || "")
+    .normalize("NFKD")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 32);
+}
+function generatedSeed() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const groups = [];
+  for (let group = 0; group < 3; group += 1) {
+    let value = "";
+    for (let index = 0; index < 4; index += 1) value += alphabet[crypto.randomInt(0, alphabet.length)];
+    groups.push(value);
+  }
+  return groups.join("-");
+}
+function resolveGenerationSeed(value, fallback = null) {
+  const raw = String(value || "").trim();
+  if (!raw) return normalizeGenerationSeed(fallback) || generatedSeed();
+  const normalized = normalizeGenerationSeed(raw);
+  if (normalized.replace(/-/g, "").length < 4) {
+    const error = new Error("Seed генерації має містити щонайменше 4 літери або цифри.");
+    error.status = 400;
+    throw error;
+  }
+  return normalized;
+}
+function withSeededRandom(seed, callback) {
+  return runWithSeed(seed, GENERATION_SCHEMA, callback);
+}
+function stableSortValue(value) {
+  if (Array.isArray(value)) return value.map(stableSortValue);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableSortValue(value[key])]));
+}
+function stableStringify(value) {
+  return JSON.stringify(stableSortValue(value));
+}
+function diagnosticHash(value, length = 12) {
+  return crypto.createHash("sha256").update(stableStringify(value)).digest("hex").toUpperCase().slice(0, length);
+}
+function formattedDiagnostic(prefix, hash) {
+  const clean = String(hash || "").replace(/[^A-Z0-9]/g, "");
+  return `${prefix}-${clean.slice(0, 4)}-${clean.slice(4, 8)}${clean.length > 8 ? `-${clean.slice(8, 12)}` : ""}`;
+}
+function generationConfigurationPayload(room, playerCount = room.players?.length || 0) {
+  const settings = room.settings || {};
+  const pack = platform.getPack(settings.contentPackId);
+  const campaign = platform.getCampaign(room.campaignId || settings.campaignId);
+  return {
+    schema: GENERATION_SCHEMA,
+    seed: normalizeGenerationSeed(settings.generationSeed),
+    playerCount: Number(playerCount || 0),
+    settings: {
+      mode: settings.mode,
+      setting: settings.setting,
+      scenarioMode: settings.scenarioMode,
+      capacity: settings.capacity,
+      rounds: settings.rounds,
+      absurdity: settings.absurdity,
+      advancedModules: [...(settings.advancedModules || [])].sort(),
+      hiddenRoles: Boolean(settings.hiddenRoles),
+      revealsPerRound: settings.revealsPerRound,
+      demographicsEnabled: settings.demographicsEnabled !== false,
+      characterSetMode: settings.characterSetMode || "extended",
+      customCharacterKeys: [...(settings.customCharacterKeys || [])].sort(),
+      tutorialEnabled: settings.tutorialEnabled === true
+    },
+    content: pack ? {
+      id: pack.id,
+      schemaVersion: pack.schemaVersion || null,
+      updatedAt: pack.updatedAt || null,
+      entriesHash: diagnosticHash(pack.entries || {}, 12)
+    } : { id: "base", version: VERSION },
+    campaign: campaign ? {
+      id: campaign.id,
+      updatedAt: campaign.updatedAt || null,
+      carryoverHash: diagnosticHash(campaign.carryover || {}, 12)
+    } : null
+  };
+}
+function generationConfigCode(room) {
+  return formattedDiagnostic("CFG", diagnosticHash(generationConfigurationPayload(room), 12));
+}
+function anonymizeGeneratedText(room, value) {
+  let text = String(value || "");
+  const ordered = [...(room.players || [])].map((player, index) => ({ name: player.name, replacement: `ГРАВЕЦЬ-${index + 1}` })).sort((a, b) => b.name.length - a.name.length);
+  for (const item of ordered) if (item.name) text = text.split(item.name).join(item.replacement);
+  return text;
+}
+function generationFingerprintPayload(room) {
+  if (!room.game) return null;
+  const playerIndex = new Map((room.players || []).map((player, index) => [player.id, index + 1]));
+  const keys = characterKeysForRoom(room);
+  return {
+    schema: GENERATION_SCHEMA,
+    configuration: generationConfigurationPayload(room),
+    catastrophe: room.game.catastrophe,
+    scenario: {
+      pressure: room.game.scenario?.pressure || 1,
+      hiddenComplication: room.game.scenario?.hiddenComplication || null,
+      complicationRevealRound: room.game.scenario?.complicationRevealRound || null
+    },
+    shelter: {
+      title: room.game.shelter?.title,
+      description: room.game.shelter?.description,
+      capacity: room.game.shelter?.capacity,
+      residentCapacity: room.game.shelter?.residentCapacity,
+      areaM2: room.game.shelter?.areaM2,
+      roomCount: room.game.shelter?.roomCount,
+      rooms: (room.game.shelter?.rooms || []).map((item) => ({ name: item.name || item.title, description: item.description })),
+      provisions: room.game.shelter?.provisions || [],
+      resources: room.game.shelter?.resources || {},
+      modules: (room.game.shelter?.modules || []).map((item) => ({ name: item.name, description: item.description, condition: item.condition }))
+    },
+    players: (room.players || []).map((player) => ({
+      values: Object.fromEntries(keys.map((key) => [key, key === "relationship" ? anonymizeGeneratedText(room, player.character?.[key]) : player.character?.[key]])),
+      demographics: player.character?.demographics || null,
+      role: player.character?.role?.id || null,
+      ability: player.character?.ability?.id || null,
+      goalId: player.character?.goalId || null,
+      goal: anonymizeGeneratedText(room, player.character?.goal || ""),
+      relationshipTargets: (player.character?.relationshipTargetIds || []).map((id) => playerIndex.get(id) || 0),
+      medical: player.character?.medicalCondition ? {
+        name: player.character.medicalCondition.name,
+        type: player.character.medicalCondition.type,
+        severity: player.character.medicalCondition.severity
+      } : null,
+      inventory: (player.character?.inventory || []).map((item) => ({ name: item.name, medicalUses: item.medicalUses || 0, medicalPotency: item.medicalPotency || 0 }))
+    })),
+    scenarioPriorities: room.game.scenarioPriorities || null,
+    revealPlan: {
+      strategy: room.game.revealStrategy || null,
+      players: (room.players || []).map((player) => ({
+        choiceKeys: [...(player.character?.revealChoiceKeys || [])],
+        pressure: player.character?.revealPressure ? { key: player.character.revealPressure.key, dueRound: player.character.revealPressure.dueRound } : null
+      }))
+    },
+    mystery: room.game.mystery ? {
+      culpritSeat: playerIndex.get(room.game.mystery.culpritId) || 0,
+      accompliceSeat: playerIndex.get(room.game.mystery.accompliceId) || 0,
+      caseBrief: stableSortValue(room.game.mystery.caseBrief || {}),
+      evidence: (room.game.mystery.evidence || []).map((item) => ({ aspect: item.aspect, label: item.label, text: anonymizeGeneratedText(room, item.text), reliability: item.reliability }))
+    } : null,
+    expeditionOfferIds: [...(room.game.expeditionOfferIds || [])]
+  };
+}
+function generationFingerprint(room) {
+  return formattedDiagnostic("GEN", diagnosticHash(generationFingerprintPayload(room), 12));
+}
+function ensureGenerationSettings(room) {
+  room.settings ||= {};
+  room.settings.generationSeed = resolveGenerationSeed(room.settings.generationSeed);
+  room.settings.generationSchema = room.settings.generationSchema || GENERATION_SCHEMA;
+  return room.settings.generationSeed;
+}
+function publicGenerationState(room) {
+  ensureGenerationSettings(room);
+  const gameMeta = room.game?.generation || null;
+  return {
+    seed: room.settings.generationSeed,
+    schema: gameMeta?.schema || room.settings.generationSchema || GENERATION_SCHEMA,
+    configCode: gameMeta?.configCode || generationConfigCode(room),
+    fingerprint: gameMeta?.fingerprint || null,
+    playerCount: room.players?.length || 0,
+    reproducible: gameMeta ? gameMeta.reproducible !== false : true,
+    migrated: Boolean(gameMeta?.migrated),
+    note: gameMeta?.migrated
+      ? "Цей seed призначено вже після створення старої партії; він не відтворює її первинну роздачу."
+      : "Однакові seed, конфігурація, кількість гравців і схема генерації дають однакову стартову партію."
+  };
+}
+
 function uid(prefix = "id") {
   return `${prefix}_${crypto.randomBytes(8).toString("hex")}`;
 }
@@ -1249,7 +1577,7 @@ function roomCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   for (let attempt = 0; attempt < 1000; attempt += 1) {
     let code = "";
-    for (let i = 0; i < 6; i += 1) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+    for (let i = 0; i < 6; i += 1) code += alphabet[Math.floor(random() * alphabet.length)];
     if (!rooms.has(code)) return code;
   }
   throw new Error("Не вдалося створити код кімнати.");
@@ -1258,16 +1586,16 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 function randomInt(min, max) {
-  return min + Math.floor(Math.random() * (max - min + 1));
+  return min + Math.floor(random() * (max - min + 1));
 }
 function sample(array) {
   if (!array?.length) return null;
-  return array[Math.floor(Math.random() * array.length)];
+  return array[Math.floor(random() * array.length)];
 }
 function shuffled(array) {
   const copy = [...array];
   for (let i = copy.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(random() * (i + 1));
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;
@@ -1294,12 +1622,12 @@ function chooseEntry(entries, absurdityLevel = 2, used = null) {
     { normal: 0.86, odd: 0.12, absurd: 0.02 },
     { normal: 0.72, odd: 0.23, absurd: 0.05 },
     { normal: 0.52, odd: 0.34, absurd: 0.14 },
-    { normal: 0.25, odd: 0.38, absurd: 0.37 }
+    { normal: 0.30, odd: 0.43, absurd: 0.27 }
   ];
   const profile = weightsByLevel[clamp(Number(absurdityLevel) || 0, 0, 4)];
   let allowed = clean.filter((item) => !used || !used.has(itemName(item)));
   if (!allowed.length) allowed = clean;
-  const roll = Math.random();
+  const roll = random();
   let level = "normal";
   if (roll > profile.normal + profile.odd) level = "absurd";
   else if (roll > profile.normal) level = "odd";
@@ -1370,12 +1698,12 @@ function contentBundle(settingId, pack = null) {
 function eventPool(room) {
   const pack = contentPackForRoom(room);
   const custom = (pack?.entries?.events || []).map((event) => ({ ...event, id: `${pack.id}_${event.id}`, choices: (event.choices || []).map((choice) => ({ ...choice })) }));
-  return [...(EVENTS[room.settings.setting] || EVENTS.modern), ...custom];
+  return [...(EVENTS[room.settings.setting] || EVENTS.modern), ...custom].filter((item) => entryAllowedByAbsurdity(item, room.settings.absurdity));
 }
 function customExpeditionPool(room) {
   const pack = contentPackForRoom(room);
   const custom = (pack?.entries?.expeditions || []).map((item) => ({ ...item, id: `${pack.id}_${item.id}` }));
-  return [...(EXPEDITIONS[room.settings.setting] || EXPEDITIONS.modern), ...custom];
+  return [...(EXPEDITIONS[room.settings.setting] || EXPEDITIONS.modern), ...custom].filter((item) => entryAllowedByAbsurdity(item, room.settings.absurdity));
 }
 
 const HEALTHY_STATUS_VARIANTS = {
@@ -1414,6 +1742,35 @@ function entryAllowedByAbsurdity(item, absurdityLevel) {
   if (level === "normal") return true;
   if (level === "odd") return maxLevel >= 1;
   return maxLevel >= 2;
+}
+function contentProfile(absurdityLevel) {
+  return [
+    { normal: 1, odd: 0, absurd: 0 },
+    { normal: 0.86, odd: 0.14, absurd: 0 },
+    { normal: 0.70, odd: 0.24, absurd: 0.06 },
+    { normal: 0.48, odd: 0.34, absurd: 0.18 },
+    { normal: 0.30, odd: 0.43, absurd: 0.27 }
+  ][clamp(Number(absurdityLevel) || 0, 0, 4)];
+}
+function chooseContentEntry(entries, absurdityLevel = 2) {
+  const allowed = (entries || []).filter((item) => entryAllowedByAbsurdity(item, absurdityLevel));
+  if (!allowed.length) return sample(entries || []);
+  const profile = contentProfile(absurdityLevel);
+  const roll = random();
+  const wanted = roll < profile.normal ? "normal" : roll < profile.normal + profile.odd ? "odd" : "absurd";
+  const candidates = allowed.filter((item) => entryLevel(item) === wanted);
+  return sample(candidates.length ? candidates : allowed);
+}
+function chooseContentEntries(entries, count, absurdityLevel = 2) {
+  const remaining = [...(entries || []).filter((item) => entryAllowedByAbsurdity(item, absurdityLevel))];
+  const chosen = [];
+  while (remaining.length && chosen.length < count) {
+    const selected = chooseContentEntry(remaining, absurdityLevel);
+    if (!selected) break;
+    chosen.push(selected);
+    remaining.splice(remaining.indexOf(selected), 1);
+  }
+  return chosen;
 }
 function weightedConditionChoice(candidates) {
   if (!candidates.length) return null;
@@ -1454,7 +1811,7 @@ function makeModules(shelter) {
     id: `module_${index}`,
     name,
     description: `Ключова система сховища «${name}». Її низький стан щораунду погіршує один із ресурсів.`,
-    condition: 55 + Math.floor(Math.random() * 41)
+    condition: 55 + Math.floor(random() * 41)
   }));
 }
 function buildRoleDeck(playerCount, enabled = true, mode = GAME_MODES.advanced) {
@@ -1640,11 +1997,8 @@ function composeIdentity(sex, genderIdentity) {
 function composeFamilyStatus(attitude) {
   return attitude && attitude !== "Не застосовується" ? String(attitude) : "Не застосовується";
 }
-function composeDemographicContext(identity, familyStatus) {
-  const parts = [];
-  if (identity && identity !== "Не застосовується") parts.push(`Ідентичність: ${identity}`);
-  if (familyStatus && familyStatus !== "Не застосовується") parts.push(`Ставлення до батьківства: ${familyStatus}`);
-  return parts.length ? parts.join(" · ") : "Не застосовується";
+function composeDemographicContext(identity) {
+  return identity && identity !== "Не застосовується" ? String(identity) : "Не застосовується";
 }
 const SIMPLE_CHILD_ATTITUDES = ["Чайлдфрі", "Не заперечує проти дітей", "Хоче мати дітей"];
 const RECIPROCAL_RELATIONSHIPS = [
@@ -1759,9 +2113,9 @@ function generateCharacter(settingId, settings, used, player, allPlayers, roleId
   if (/безплід|стерильн/i.test(healthValue)) reproductiveStatus = "Безпліддя";
   const identity = composeIdentity(finalSex, finalGenderIdentity);
   const familyStatus = composeFamilyStatus(finalAttitude);
-  const demographicContext = composeDemographicContext(identity, familyStatus);
+  const demographicContext = composeDemographicContext(identity);
   const relationship = "Стосунок буде сформовано після роздачі персонажів.";
-  const age = `${18 + Math.floor(Math.random() * 58)} років`;
+  const age = `${18 + Math.floor(random() * 58)} років`;
   const profession = chooseEntry(data.professions, absurdity, used.profession);
   const skill = chooseEntry(data.skills, absurdity, used.skill);
   const trait = chooseEntry(common.traits, absurdity, used.trait);
@@ -1784,6 +2138,7 @@ function generateCharacter(settingId, settings, used, player, allPlayers, roleId
   } : {
     origin,
     demographicContext,
+    attitudeToChildren: finalAttitude,
     anomaly,
     age,
     profession,
@@ -1858,7 +2213,7 @@ function initializeDetectiveMystery(room) {
   const candidates = shuffled(room.players.filter((player) => player.character));
   const culprit = candidates[0];
   if (!culprit) return;
-  const accomplice = room.players.length >= 8 && Math.random() < 0.35 ? candidates[1] : null;
+  const accomplice = room.players.length >= 8 && random() < 0.35 ? candidates[1] : null;
   const caseBrief = DETECTIVE_CASE.caseBriefFor(room.game.catastrophe);
   const truth = {
     crime: caseBrief.crime,
@@ -1966,7 +2321,7 @@ function revealDetectiveClue(room) {
   };
   mystery.evidence.push({
     id: uid("clue"), round: room.game.round, aspect, label: detectiveAspectLabel(aspect),
-    text: texts[aspect], reliability: Math.random() < 0.3 ? 2 : 3, disputed: false,
+    text: texts[aspect], reliability: random() < 0.3 ? 2 : 3, disputed: false,
     candidateNames: candidatePlayers.map((item) => item.name)
   });
 }
@@ -1981,7 +2336,7 @@ function detectiveInvestigationStrength(character, bonus = 0) {
 function runDetectiveInvestigation(room, investigator, target, aspect, options = {}) {
   const labels = { alibi: "алібі", motive: "мотив", access: "доступ", testimony: "свідчення", evidenceLink: "зв’язок із доказами" };
   const protectedAspect = target.character.caseProtection?.aspect;
-  let success = Math.random() < detectiveInvestigationStrength(investigator.character, options.bonus || 0);
+  let success = random() < detectiveInvestigationStrength(investigator.character, options.bonus || 0);
   let resultType = "inconclusive";
   let result = `Перевірка ${labels[aspect]} не дала надійного висновку. Дані можна тлумачити кількома способами.`;
   if ((protectedAspect === aspect || protectedAspect === "*") && target.character.caseProtection?.uses > 0) {
@@ -2044,7 +2399,7 @@ function publishDetectiveFinding(room, player) {
 }
 function castDetectiveAccusation(room, player, body) {
   if (room.settings.setting !== "detective" || !room.game?.mystery) throw new Error("Фінальне звинувачення доступне лише в детективному сетингу.");
-  if (!player.active || isDetained(room, player) || isSilenced(room, player)) throw new Error("Ви не можете висунути звинувачення зараз.");
+  if (!canParticipateInDecision(room, player, "final_accusation")) throw new Error("Ви не можете висунути звинувачення зараз.");
   if (room.game.phase === "final") throw new Error("Справу вже завершено.");
   const target = room.players.find((candidate) => candidate.id === String(body.targetId || "") && candidate.id !== player.id);
   if (!target) throw new Error("Оберіть іншого учасника як головного підозрюваного.");
@@ -2103,7 +2458,7 @@ function balancedStartingResources(initialResources, catastrophe) {
     const raw = Number(initialResources?.[key] ?? fallback);
     const compressed = 58 + (raw - 58) * 0.55;
     const pressurePenalty = ["food", "water", "energy", "medicine"].includes(key) ? Math.max(0, pressure - 1) * 13 : Math.max(0, pressure - 1) * 6;
-    const jitter = Math.floor(Math.random() * 13) - 7;
+    const jitter = Math.floor(random() * 13) - 7;
     result[key] = clamp(Math.round(compressed - pressurePenalty + jitter), 28, 88);
   }
   return result;
@@ -2217,6 +2572,17 @@ function revealRequirement(room, player) {
   const required = Math.min(Number(room.settings.revealsPerRound || 0), hidden + used);
   return { required, used, complete: required === 0 || used >= required || isAutomationSkipped(room, player.id) };
 }
+function eventDecisionPolicy(room) {
+  return room.game?.features?.elimination ? "host" : "collective";
+}
+function eventDecisionEligible(room, player) {
+  if (!player || !room.game || room.game.phase !== "event") return false;
+  if (eventDecisionPolicy(room) === "host") return player.id === room.hostPlayerId;
+  return canParticipateInDecision(room, player, "event");
+}
+function eventDecisionVoters(room) {
+  return room.players.filter((player) => eventDecisionEligible(room, player));
+}
 function neutralEventChoice(event) {
   const choices = Array.isArray(event?.choices) ? event.choices : [];
   return [...choices].sort((a, b) => {
@@ -2237,11 +2603,31 @@ function neutralizePlayerForPhase(room, player, reason = "тайм-аут") {
     game.log.push(`Автоматичний ведучий: ${player.name} пропускає розкриття через ${reason}.`);
     return true;
   }
+  if (phase === "investigation" && room.settings.setting === "detective" && game.mystery) {
+    if (!player.active || isDetained(room, player) || player.character?.investigationUsedRound === game.round) return false;
+    const candidates = room.players
+      .filter((candidate) => candidate.active && candidate.id !== player.id)
+      .sort((a, b) => Number(game.mystery.publicTheory?.[a.id] || 0) - Number(game.mystery.publicTheory?.[b.id] || 0) || String(a.id).localeCompare(String(b.id)));
+    const target = candidates[0];
+    if (!target) return false;
+    const aspects = DETECTIVE_CASE.ASPECTS || ["alibi"];
+    const playerIndex = Math.max(0, room.players.findIndex((candidate) => candidate.id === player.id));
+    const aspect = aspects[(Number(game.round || 1) + playerIndex - 1) % aspects.length] || "alibi";
+    runDetectiveInvestigation(room, player, target, aspect);
+    player.character.investigationUsedRound = game.round;
+    markAutomationSkipped(room, player, reason, "нейтральна приватна перевірка");
+    game.log.push(`Автоматичний ведучий: для відсутнього гравця ${player.name} проведено нейтральну приватну перевірку без розкриття його ролі.`);
+    return true;
+  }
   if (phase === "event") {
-    if (!player.active || isDetained(room, player) || isSilenced(room, player) || game.eventVotes?.[player.id]) return false;
-    game.eventVotes[player.id] = SKIP_VOTE;
-    markAutomationSkipped(room, player, reason, "утримання під час кризи");
-    game.log.push(`Автоматичний ведучий: для ${player.name} зафіксовано утримання під час кризи.`);
+    if (!eventDecisionEligible(room, player) || game.eventVotes?.[player.id]) return false;
+    const hostDecision = eventDecisionPolicy(room) === "host";
+    const neutralChoice = neutralEventChoice(game.event);
+    game.eventVotes[player.id] = hostDecision && neutralChoice ? neutralChoice.id : SKIP_VOTE;
+    markAutomationSkipped(room, player, reason, hostDecision ? "нейтральне рішення кризи" : "утримання під час кризи");
+    game.log.push(hostDecision
+      ? `Автоматичний ведучий: для кризи обрано нейтральний варіант через ${reason}.`
+      : `Автоматичний ведучий: для ${player.name} зафіксовано утримання під час кризи.`);
     return true;
   }
   if (phase === "elimination") {
@@ -2287,8 +2673,13 @@ function phaseRequiredStatus(room) {
       required += 1;
       if (revealRequirement(room, player).complete) completed += 1;
       else pending.push(player);
+    } else if (game.phase === "investigation") {
+      if (room.settings.setting !== "detective" || !game.mystery || !player.active || isDetained(room, player)) continue;
+      required += 1;
+      if (player.character?.investigationUsedRound === game.round || isAutomationSkipped(room, player.id)) completed += 1;
+      else pending.push(player);
     } else if (game.phase === "event") {
-      if (!player.active || isDetained(room, player) || isSilenced(room, player)) continue;
+      if (!eventDecisionEligible(room, player)) continue;
       required += 1;
       if (game.eventVotes?.[player.id]) completed += 1;
       else pending.push(player);
@@ -2344,7 +2735,7 @@ function autoAdvanceCurrentPhase(room, reason = "автоматичний вед
   if (game.phase === "event" && !game.event?.resolved) {
     resolveEvent(room);
     const runtime = ensureAutomationRuntime(room);
-    runtime.nextAutoAdvanceAt = Date.now() + 1800;
+    runtime.nextAutoAdvanceAt = Date.now() + AUTO_EVENT_DELAY_MS;
     runtime.lastPhaseMessage = "Кризу автоматично підраховано";
     return true;
   }
@@ -2365,7 +2756,7 @@ function processRoomAutomation(room) {
   const now = Date.now();
   let changed = false;
   const required = phaseRequiredStatus(room);
-  const hasRequired = ["reveal", "event", "elimination"].includes(room.game.phase);
+  const hasRequired = ["reveal", "investigation", "event", "elimination"].includes(room.game.phase);
   if (config.mode === "assist") {
     const absent = required.pending.filter((player) => playerIsAutomationInactive(room, player, now));
     for (const player of absent) if (neutralizePlayerForPhase(room, player, `відсутність понад ${config.inactivitySeconds} с`)) changed = true;
@@ -2373,10 +2764,10 @@ function processRoomAutomation(room) {
   if (config.mode === "auto" && runtime.phaseDeadlineAt && now >= runtime.phaseDeadlineAt) {
     const names = neutralizePendingPlayers(room, { allPending: true, reason: `завершення ліміту фази (${config.phaseSeconds} с)` });
     if (names.length) changed = true;
-    if (!runtime.nextAutoAdvanceAt) runtime.nextAutoAdvanceAt = now + 800;
+    if (!runtime.nextAutoAdvanceAt) runtime.nextAutoAdvanceAt = now + AUTO_PHASE_DELAY_MS;
   }
   if (config.mode === "auto" && hasRequired && phaseRequiredStatus(room).pending.length === 0 && !runtime.nextAutoAdvanceAt) {
-    runtime.nextAutoAdvanceAt = now + 1200;
+    runtime.nextAutoAdvanceAt = now + AUTO_ADVANCE_DELAY_MS;
   }
   if (config.mode === "auto" && runtime.nextAutoAdvanceAt && now >= runtime.nextAutoAdvanceAt) {
     runtime.nextAutoAdvanceAt = null;
@@ -2385,7 +2776,7 @@ function processRoomAutomation(room) {
   return changed;
 }
 
-function createGame(room) {
+function createSeededGame(room) {
   const mode = modeConfig(room.settings);
   room.settings.hiddenRoles = mode.hiddenRoles;
   if (!mode.elimination) room.settings.capacity = room.players.length;
@@ -2393,10 +2784,13 @@ function createGame(room) {
   const bundle = contentBundle(room.settings.setting, pack);
   const data = bundle.data;
   const settingRule = SETTING_RULES[room.settings.setting] || null;
-  const catastrophe = room.settings.scenarioMode === "catalog"
-    ? { ...LORE.enrichCatastrophe(sample(data.catastrophes)), procedural: false, modules: null, pressure: 1, startingEffects: {}, hiddenComplication: null, complicationRevealRound: null }
-    : SCENARIOS.generate(room.settings.setting);
-  const shelterBase = compactShelterDefinition(sample(data.shelters));
+  const tutorial = tutorialEnabled(room);
+  const catastrophe = tutorial
+    ? JSON.parse(JSON.stringify(TUTORIAL_CATASTROPHE))
+    : room.settings.scenarioMode === "catalog"
+      ? { ...LORE.enrichCatastrophe(chooseContentEntry(data.catastrophes, room.settings.absurdity)), procedural: false, modules: null, pressure: 1, startingEffects: {}, hiddenComplication: null, complicationRevealRound: null }
+      : SCENARIOS.generate(room.settings.setting, room.settings.absurdity);
+  const shelterBase = compactShelterDefinition(tutorial ? TUTORIAL_SHELTER : sample(data.shelters));
   const used = Object.fromEntries([
     "origin", "genderIdentity", "attitudeToChildren", "anomaly",
     "profession", "health", "skill", "trait", "item", "hobby", "phobia", "secret", "relationship",
@@ -2450,7 +2844,7 @@ function createGame(room) {
       roomCount: shelterBase.roomCount,
       rooms: (shelterBase.rooms || []).map((roomInfo) => ({ ...roomInfo })),
       provisions: (shelterBase.provisions || []).map((item) => ({ ...item })),
-      resources: balancedStartingResources(shelterBase.initialResources, catastrophe),
+      resources: tutorial ? { ...TUTORIAL_SHELTER.initialResources } : balancedStartingResources(shelterBase.initialResources, catastrophe),
       modules: makeModules(shelterBase),
       allies: 0,
       assets: []
@@ -2496,8 +2890,12 @@ function createGame(room) {
       `Катастрофа: ${catastrophe.title}.`,
       `Сховище: ${shelterBase.title}; площа — ${shelterBase.areaM2} м²; приміщень — ${shelterBase.roomCount}; проєктна місткість — ${estimateShelterResidentCapacity(shelterBase)}; до фінальної групи потрібно відібрати ${room.settings.capacity}.`
     ],
-    final: null
+    final: null,
+    tutorial: tutorial ? { enabled: true, version: 1, startedAt: Date.now(), completed: false } : null
   };
+  if (tutorial) {
+    room.game.log.push("Навчальна партія: перший раунд знайомить із розкриттям і кризою без санкцій; другий додає повне рішення громади.");
+  }
   if (mode.id === "survival" && room.settings.setting !== "detective") {
     const sharedKeys = ["profession", "health", "skill", "trait", "item"].filter((key) => characterKeysForRoom(room).includes(key));
     for (const player of room.players) {
@@ -2527,15 +2925,7 @@ function createGame(room) {
     const notes = applyEffects(room, settingRule.startEffects);
     room.game.log.push(`Правило сетингу «${settingRule.name}»: ${notes}.`);
   }
-  const campaign = platform.getCampaign(room.campaignId);
-  if (campaign?.carryover) {
-    const carryEffects = { ...(campaign.carryover.resources || {}) };
-    if (campaign.carryover.morale) carryEffects.morale = (carryEffects.morale || 0) + campaign.carryover.morale;
-    if (campaign.carryover.allies) carryEffects.allies = campaign.carryover.allies;
-    const notes = applyEffects(room, carryEffects);
-    for (const legacy of campaign.carryover.legacy || []) room.game.shelter.assets.push({ name: legacy, description: "Спадщина попереднього розділу кампанії." });
-    if (notes || campaign.carryover.legacy?.length) room.game.log.push(`Спадщина кампанії: ${notes || "збережені об’єкти"}.`);
-  }
+  initializeCampaignLegacy(room);
   if (room.settings.setting === "detective") initializeDetectiveMystery(room);
   room.game.scenarioPriorities = buildScenarioPriorities(room);
   validatePriorities(room.game.scenarioPriorities);
@@ -2543,6 +2933,24 @@ function createGame(room) {
   initializeStrategicReveals(room);
   if (mode.operations) refreshExpeditionOffers(room, true);
   startAutomationPhase(room);
+}
+function createGame(room) {
+  applyTutorialPreset(room.settings, room.players.length);
+  room.campaignId = room.settings.tutorialEnabled ? null : room.campaignId;
+  const seed = ensureGenerationSettings(room);
+  withSeededRandom(seed, () => createSeededGame(room));
+  room.game.generation = {
+    seed,
+    schema: GENERATION_SCHEMA,
+    configCode: generationConfigCode(room),
+    fingerprint: generationFingerprint(room),
+    playerCount: room.players.length,
+    reproducible: true,
+    migrated: false,
+    createdAt: Date.now()
+  };
+  room.settings.generationSchema = GENERATION_SCHEMA;
+  room.game.log.push(`Відтворювана генерація: seed ${seed}; код ${room.game.generation.configCode}; відбиток ${room.game.generation.fingerprint}.`);
 }
 
 function publicCatastrophe(room, includeHidden = false) {
@@ -2596,6 +3004,144 @@ function applyEffects(room, effects) {
   }
   return notes.join(", ");
 }
+function campaignLegacyEligibleVoters(room) {
+  return activePlayers(room).filter((player) => canParticipateInDecision(room, player, "campaign"));
+}
+function campaignLegacyOptionAffordable(room, option) {
+  const resources = room.game?.shelter?.resources || {};
+  return Object.entries(option?.requires || {}).every(([key, amount]) => Number(resources[key] || 0) >= Number(amount || 0));
+}
+function campaignLegacyTally(room) {
+  const legacy = room.game?.campaignLegacy;
+  if (!legacy?.dilemma) return [];
+  const eligible = new Set(campaignLegacyEligibleVoters(room).map((player) => player.id));
+  const counts = Object.fromEntries((legacy.dilemma.options || []).map((option) => [option.id, 0]));
+  for (const [playerId, optionId] of Object.entries(legacy.dilemma.votes || {})) {
+    if (eligible.has(playerId) && Object.prototype.hasOwnProperty.call(counts, optionId)) counts[optionId] += 1;
+  }
+  return (legacy.dilemma.options || []).map((option) => ({ optionId: option.id, count: counts[option.id] || 0 }));
+}
+function publicCampaignLegacy(room, requester) {
+  const legacy = room.game?.campaignLegacy;
+  if (!legacy?.enabled || !legacy.dilemma) return null;
+  const eligible = campaignLegacyEligibleVoters(room);
+  const tally = campaignLegacyTally(room);
+  const counts = Object.fromEntries(tally.map((item) => [item.optionId, item.count]));
+  const dilemma = legacy.dilemma;
+  return {
+    enabled: true,
+    campaignName: legacy.campaignName,
+    chapterNumber: legacy.chapterNumber,
+    sourceChapter: legacy.sourceChapter || null,
+    startingSummary: legacy.startingSummary || null,
+    startingEffects: { ...(legacy.startingEffects || {}) },
+    legacyAssets: [...(legacy.legacyAssets || [])],
+    dilemma: {
+      id: dilemma.id,
+      kind: dilemma.kind,
+      title: dilemma.title,
+      context: dilemma.context,
+      benefit: dilemma.benefit,
+      dueRound: dilemma.dueRound,
+      status: dilemma.status,
+      resolvedOptionId: dilemma.resolvedOptionId || null,
+      resultText: dilemma.resultText || null,
+      automatic: Boolean(dilemma.automatic),
+      options: (dilemma.options || []).map((option) => ({
+        id: option.id,
+        label: option.label,
+        description: option.description,
+        effects: { ...(option.effects || {}) },
+        affordable: campaignLegacyOptionAffordable(room, option),
+        votes: counts[option.id] || 0
+      }))
+    },
+    myVote: dilemma.votes?.[requester.id] || null,
+    eligibleVoters: eligible.length,
+    votesCast: Object.keys(dilemma.votes || {}).filter((playerId) => eligible.some((player) => player.id === playerId)).length,
+    canVote: dilemma.status === "open" && eligible.some((player) => player.id === requester.id),
+    canResolve: requester.id === room.hostPlayerId && dilemma.status === "open",
+    history: (legacy.history || []).slice(-8).map((item) => ({ ...item }))
+  };
+}
+function initializeCampaignLegacy(room, { migrated = false } = {}) {
+  const campaign = platform.getCampaign(room.campaignId || room.settings?.campaignId);
+  if (!campaign || !campaign.chapters?.length || !room.game) {
+    room.game.campaignLegacy = null;
+    return null;
+  }
+  if (room.game.campaignLegacy !== undefined) return room.game.campaignLegacy;
+  const legacy = buildCampaignLegacy(campaign, room.game.maxRounds || room.settings.rounds);
+  if (!legacy) {
+    room.game.campaignLegacy = null;
+    return null;
+  }
+  legacy.migrated = Boolean(migrated);
+  legacy.startingApplied = !migrated;
+  legacy.startingSummary = migrated ? "Стара активна кімната: попередні стартові ефекти не застосовуються повторно." : "";
+  room.game.campaignLegacy = legacy;
+  if (!migrated) {
+    const notes = applyEffects(room, legacy.startingEffects || balancedStartingEffects(campaign.carryover || {}));
+    for (const name of legacy.legacyAssets || []) {
+      room.game.shelter.assets.push({ name, description: "Спадковий об’єкт кампанії. Його перевага пов’язана з окремим зобов’язанням.", campaignLegacy: true });
+    }
+    legacy.startingSummary = [notes, legacy.legacyAssets?.length ? `спадкові об’єкти: ${legacy.legacyAssets.join(", ")}` : ""].filter(Boolean).join("; ") || "Числової стартової переваги немає.";
+  }
+  room.game.log.push(`Кампанійна спадщина: ${legacy.dilemma.title}. Перевага має ціну; рішення потрібно ухвалити до завершення ${legacy.dilemma.dueRound}-го раунду.`);
+  return legacy;
+}
+function applyCampaignLegacyOption(room, option) {
+  const legacy = room.game.campaignLegacy;
+  const notes = [];
+  const effectText = applyEffects(room, option.effects || {});
+  if (effectText) notes.push(effectText);
+  if (Number(option.moduleDelta || 0)) {
+    const module = [...(room.game.shelter.modules || [])].sort((a, b) => Number(a.condition || 0) - Number(b.condition || 0))[0];
+    if (module) {
+      const before = Number(module.condition || 0);
+      module.condition = clamp(before + Number(option.moduleDelta || 0), 0, 100);
+      notes.push(`${module.name}: ${before}% → ${module.condition}%`);
+    }
+  }
+  if (option.removeLegacyAsset) {
+    const targetName = legacy.dilemma.legacyAsset || legacy.legacyAssets?.[0];
+    const index = room.game.shelter.assets.findIndex((asset) => (typeof asset === "string" ? asset : asset?.name) === targetName);
+    if (index >= 0) room.game.shelter.assets.splice(index, 1);
+    notes.push(`об’єкт «${targetName || "спадщина"}» розібрано`);
+  }
+  return notes.join("; ") || "без числових змін";
+}
+function resolveCampaignLegacy(room, { automatic = false, force = false } = {}) {
+  const legacy = room.game?.campaignLegacy;
+  const dilemma = legacy?.dilemma;
+  if (!legacy?.enabled || !dilemma || dilemma.status !== "open") return null;
+  const eligible = campaignLegacyEligibleVoters(room);
+  const tally = campaignLegacyTally(room);
+  const votesCast = tally.reduce((sum, item) => sum + item.count, 0);
+  if (!automatic && !force && votesCast < eligible.length && Number(room.game.round || 1) < Number(dilemma.dueRound || 1)) {
+    throw new Error(`Ще не всі учасники проголосували (${votesCast}/${eligible.length}). Хост може завершити рішення достроково окремим підтвердженням.`);
+  }
+  const maxVotes = Math.max(0, ...tally.map((item) => item.count));
+  const leaders = tally.filter((item) => item.count === maxVotes && maxVotes > 0).map((item) => item.optionId);
+  let optionId = leaders.length === 1 ? leaders[0] : dilemma.fallbackOptionId;
+  let option = (dilemma.options || []).find((item) => item.id === optionId);
+  if (!option || !campaignLegacyOptionAffordable(room, option)) {
+    option = (dilemma.options || []).find((item) => item.id === dilemma.fallbackOptionId && campaignLegacyOptionAffordable(room, item))
+      || (dilemma.options || []).find((item) => campaignLegacyOptionAffordable(room, item))
+      || (dilemma.options || []).at(-1);
+  }
+  if (!option) throw new Error("Для кампанійної спадщини не визначено доступного рішення.");
+  const resultNotes = applyCampaignLegacyOption(room, option);
+  dilemma.status = "resolved";
+  dilemma.resolvedOptionId = option.id;
+  dilemma.resolvedAt = Date.now();
+  dilemma.automatic = Boolean(automatic);
+  dilemma.resultText = `${option.label}: ${resultNotes}.`;
+  legacy.history ||= [];
+  legacy.history.push({ round: room.game.round, optionId: option.id, label: option.label, resultText: dilemma.resultText, automatic: Boolean(automatic), votes: tally });
+  room.game.log.push(`Кампанійна дилема${automatic ? " автоматично" : ""} вирішена — «${option.label}». ${resultNotes}.`);
+  return option;
+}
 function activePlayers(room) {
   return room.players.filter((player) => player.active);
 }
@@ -2605,8 +3151,26 @@ function isDetained(room, player) {
 function isSilenced(room, player) {
   return Boolean(player?.active && (Number(player.silencedUntilRound || 0) >= Number(room.game?.round || 0) || player.character?.silencedRound === room.game?.round));
 }
-function eligibleVoters(room) {
-  return activePlayers(room).filter((player) => !isDetained(room, player) && !isSilenced(room, player));
+const SILENCE_BLOCKED_DECISIONS = new Set(["general", "event", "elimination", "campaign", "outside_deal", "request", "final_accusation", "appeal"]);
+function canParticipateInDecision(room, player, type = "general") {
+  if (!player?.active) return false;
+  if (isDetained(room, player)) return false;
+  if (isSilenced(room, player) && SILENCE_BLOCKED_DECISIONS.has(type)) return false;
+  return true;
+}
+function decisionPermissions(room, player) {
+  return {
+    general: canParticipateInDecision(room, player, "general"),
+    event: canParticipateInDecision(room, player, "event"),
+    elimination: canParticipateInDecision(room, player, "elimination"),
+    campaign: canParticipateInDecision(room, player, "campaign"),
+    request: canParticipateInDecision(room, player, "request"),
+    finalAccusation: canParticipateInDecision(room, player, "final_accusation"),
+    specialist: canParticipateInDecision(room, player, "specialist")
+  };
+}
+function eligibleVoters(room, type = "general") {
+  return activePlayers(room).filter((player) => canParticipateInDecision(room, player, type));
 }
 function pendingAppeals(room) {
   return room.players.filter((player) => !player.active && room.game?.appeals?.[player.id]?.status === "pending");
@@ -2614,6 +3178,7 @@ function pendingAppeals(room) {
 function shouldRunJudgement(room) {
   const mode = modeConfig(room.settings);
   if (!mode.elimination) return false;
+  if (room.settings.soloTestMode === true && activePlayers(room).length === 1) return true;
   if (activePlayers(room).length > room.settings.capacity) return true;
   if (room.settings.voteSystem === "tribunal" && !mode.endWhenCapacityReached) return true;
   return pendingAppeals(room).length > 0;
@@ -2651,7 +3216,8 @@ function ensureRoomSessionState(room) {
   room.hostLastChangedAt ||= room.createdAt || Date.now();
   room.settings ||= {};
   room.settings.hostFailoverEnabled = room.settings.hostFailoverEnabled !== false;
-  room.settings.hostFailoverSeconds = clamp(Number(room.settings.hostFailoverSeconds) || 120, 15, 900);
+  room.settings.hostFailoverSeconds = clamp(Number(room.settings.hostFailoverSeconds) || 120, MIN_HOST_FAILOVER_SECONDS, 900);
+  ensureGenerationSettings(room);
   for (const player of room.players || []) ensurePlayerSessionFields(player, room);
   const seen = new Set();
   for (const player of room.players || []) {
@@ -2700,7 +3266,7 @@ function processHostFailover(room, now = Date.now()) {
   ensureRoomSessionState(room);
   if (room.settings.hostFailoverEnabled === false) return false;
   const host = room.players.find((player) => player.id === room.hostPlayerId);
-  const threshold = clamp(Number(room.settings.hostFailoverSeconds) || 120, 15, 900);
+  const threshold = clamp(Number(room.settings.hostFailoverSeconds) || 120, MIN_HOST_FAILOVER_SECONDS, 900);
   if (host && now - Number(host.lastSeen || 0) < threshold * 1000) return false;
   const candidate = hostFailoverCandidate(room, now);
   if (!candidate) return false;
@@ -2708,37 +3274,17 @@ function processHostFailover(room, now = Date.now()) {
   return transferHost(room, candidate, `Автоматична заміна: ${hostName} відсутній понад ${threshold} с`);
 }
 
-let saveTimer = null;
-function saveRoomsNow() {
-  fs.mkdirSync(path.dirname(SAVE_FILE), { recursive: true });
-  const serializable = [...rooms.values()].filter((room) => Date.now() - room.updatedAt < 1000 * 60 * 60 * 24 * 30);
-  const temp = `${SAVE_FILE}.tmp`;
-  fs.writeFileSync(temp, JSON.stringify(serializable, null, 2), "utf8");
-  fs.renameSync(temp, SAVE_FILE);
-}
-function saveRoomsSoon() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try { saveRoomsNow(); }
-    catch (error) { console.error("Помилка збереження кімнат:", error.message); }
-  }, 180);
-}
-function backupRooms(label = "manual") {
-  try {
-    if (!fs.existsSync(SAVE_FILE)) return;
-    const dir = path.join(path.dirname(SAVE_FILE), "backups");
-    fs.mkdirSync(dir, { recursive: true });
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    fs.copyFileSync(SAVE_FILE, path.join(dir, `${stamp}_rooms_${label}.json`));
-    const files = fs.readdirSync(dir).filter((name) => name.includes("_rooms_") && name.endsWith(".json")).sort().reverse();
-    for (const name of files.slice(8)) fs.unlinkSync(path.join(dir, name));
-  } catch (error) { console.warn("Резервну копію кімнат не створено:", error.message); }
-}
+function persistentRooms(now = Date.now()) { return roomStore.persistentRooms(now); }
+function saveRoomsNow() { return roomStore.saveNow(); }
+function saveRoomsAsync() { return roomStore.saveAsync(); }
+function saveRoomsSoon() { return roomStore.saveSoon(); }
+function backupRooms(label = "manual") { return roomStore.backup(label); }
+function readPersistedRoomFiles() { return roomStore.read(); }
 function loadRooms() {
   try {
-    if (!fs.existsSync(SAVE_FILE)) return;
-    const parsed = JSON.parse(fs.readFileSync(SAVE_FILE, "utf8"));
+    const parsed = readPersistedRoomFiles();
     for (const room of parsed) {
+      if (Date.now() - Number(room.updatedAt || room.createdAt || Date.now()) >= ROOM_TTL_MS) continue;
       room.players.forEach((player) => {
         player.connected = false;
         ensurePlayerSessionFields(player, room);
@@ -2762,6 +3308,8 @@ function loadRooms() {
       room.settings ||= {};
       ensureRoomSessionState(room);
       room.settings.mode ||= "advanced";
+      room.settings.tutorialEnabled = room.settings.tutorialEnabled === true;
+      applyTutorialPreset(room.settings, room.players.length);
       room.settings.scenarioMode = SCENARIO_MODES.has(room.settings.scenarioMode) ? room.settings.scenarioMode : "procedural";
       room.settings.voteSystem = VOTE_SYSTEMS.has(room.settings.voteSystem) ? room.settings.voteSystem : (room.settings.mode === "classic" ? "exile" : "tribunal");
       room.settings.voteVisibility = VOTE_VISIBILITIES.has(room.settings.voteVisibility) ? room.settings.voteVisibility : "secret";
@@ -2781,7 +3329,8 @@ function loadRooms() {
           if (!player.character) continue;
           player.character.identity ||= composeIdentity(player.character.sex, player.character.genderIdentity);
           player.character.familyStatus ||= composeFamilyStatus(player.character.attitudeToChildren);
-          player.character.demographicContext ||= composeDemographicContext(player.character.identity, player.character.familyStatus);
+          player.character.demographicContext ||= composeDemographicContext(player.character.identity);
+          player.character.attitudeToChildren ||= player.character.familyStatus || "Не застосовується";
           player.character.demographics ||= {
             enabled: room.settings.demographicsEnabled !== false,
             sex: player.character.sex || "Не застосовується",
@@ -2794,13 +3343,16 @@ function loadRooms() {
           player.character.demographics.enabled = room.settings.demographicsEnabled !== false;
           player.character.descriptions ||= descriptionsFor(player.character);
           player.character.descriptions.demographicContext ||= describeCharacteristic("demographicContext", player.character.demographicContext);
+          player.character.descriptions.attitudeToChildren ||= describeCharacteristic("attitudeToChildren", player.character.attitudeToChildren);
           const migratedRevealed = player.character.revealed || {};
-          if (migratedRevealed.sex || migratedRevealed.genderIdentity || migratedRevealed.identity || migratedRevealed.attitudeToChildren || migratedRevealed.familyStatus || migratedRevealed.parentalStatus || migratedRevealed.reproductiveStatus) migratedRevealed.demographicContext = true;
+          if (migratedRevealed.sex || migratedRevealed.genderIdentity || migratedRevealed.identity || migratedRevealed.parentalStatus || migratedRevealed.reproductiveStatus) migratedRevealed.demographicContext = true;
+          if (migratedRevealed.attitudeToChildren || migratedRevealed.familyStatus) migratedRevealed.attitudeToChildren = true;
           ["sex", "genderIdentity", "identity", "attitudeToChildren", "familyStatus", "parentalStatus", "reproductiveStatus"].forEach((key) => delete migratedRevealed[key]);
-          if (room.settings.demographicsEnabled === false) delete migratedRevealed.demographicContext;
+          if (room.settings.demographicsEnabled === false) { delete migratedRevealed.demographicContext; delete migratedRevealed.attitudeToChildren; }
           player.character.revealed = migratedRevealed;
         }
         room.game.mode ||= room.settings.mode;
+        if (room.settings.tutorialEnabled) room.game.tutorial ||= { enabled: true, version: 1, startedAt: room.createdAt || Date.now(), completed: room.game.phase === "final" };
         room.game.shelter ||= {};
         room.game.shelter.selectionCapacity ||= room.game.shelter.capacity || room.settings.capacity;
         room.game.shelter.residentCapacity ||= estimateShelterResidentCapacity(room.game.shelter);
@@ -2826,6 +3378,7 @@ function loadRooms() {
         room.game.judgementHistory ||= [];
         room.game.treatmentHistory ||= [];
         room.game.reasonHistory ||= [];
+        if (room.game.campaignLegacy === undefined) initializeCampaignLegacy(room, { migrated: true });
         ensureAutomationRuntime(room);
         ensureOperationSupport(room);
         room.game.scenarioPriorities ||= buildScenarioPriorities(room);
@@ -2834,10 +3387,23 @@ function loadRooms() {
         room.game.expeditionOfferIds ||= [];
         room.game.expeditionOfferRound ||= room.game.round || 1;
         if (room.game.features.operations) refreshExpeditionOffers(room, !room.game.expeditionOfferIds.length);
+        if (!room.game.generation) {
+          room.game.generation = {
+            seed: room.settings.generationSeed,
+            schema: room.settings.generationSchema || GENERATION_SCHEMA,
+            configCode: generationConfigCode(room),
+            fingerprint: generationFingerprint(room),
+            playerCount: room.players.length,
+            reproducible: false,
+            migrated: true,
+            createdAt: room.createdAt || Date.now()
+          };
+        }
       }
       if (room.game?.phase === "event" && !room.game.event) createEvent(room);
       rooms.set(room.code, room);
     }
+    if (parsed.length) saveRoomsSoon();
   } catch (error) {
     console.warn("Збереження кімнат не завантажено:", error.message);
   }
@@ -2887,7 +3453,11 @@ function publicPlayer(player, room) {
       detained: isDetained(room, player),
       silenced: isSilenced(room, player),
       medicalIsolation: Number(player.character.medicalIsolationUntilRound || 0) >= Number(room.game?.round || 0),
-      medical: publicMedicalCondition(player)
+      medical: publicMedicalCondition(player),
+      decisionPermissions: decisionPermissions(room, player),
+      sanctionEffects: isDetained(room, player)
+        ? ["Не голосує", "Не лікує", "Не ремонтує", "Не бере участі в експедиції", "Не використовує активні здібності"]
+        : isSilenced(room, player) ? ["Не бере участі в колективних рішеннях", "Не створює стратегічні запити", "Не висуває фінальне звинувачення"] : []
     } : null
   };
 }
@@ -2936,6 +3506,13 @@ function hostDashboardFor(room) {
         : revealComplete
           ? { code: 'done', label: autoSkipped ? 'Розкриття пропущено автоматично' : 'Розкриття завершено', detail: autoSkipped ? 'Нейтральний автопропуск' : `${revealsUsed}/${revealRequired}` }
           : { code: 'pending', label: 'Очікується розкриття', detail: `${revealsUsed}/${revealRequired}` };
+    } else if (phase === 'investigation' && room.settings.setting === 'detective') {
+      const investigated = player.character?.investigationUsedRound === game.round || autoSkipped;
+      phaseState = !active || detained
+        ? { code: 'exempt', label: 'Не проводить перевірку', detail: !active ? 'Поза сховищем' : 'Ізоляція' }
+        : investigated
+          ? { code: 'done', label: autoSkipped ? 'Нейтральну перевірку виконано автоматично' : 'Приватну перевірку виконано', detail: autoSkipped ? 'Роль та результат не розкриваються' : 'Результат у приватному блокноті' }
+          : { code: 'pending', label: 'Очікується приватна перевірка', detail: 'Одна перевірка на раунд' };
     } else if (isSocialPhase(phase) || phase === 'operations') {
       phaseState = !active && features.outsidePlay && isSocialPhase(phase)
         ? { code: player.outsideActionUsedRound === game.round ? 'done' : 'optional', label: player.outsideActionUsedRound === game.round ? 'Зовнішню дію виконано' : 'Зовнішня дія доступна', detail: publicActions.join(' · ') || 'Не використано' }
@@ -2943,11 +3520,13 @@ function hostDashboardFor(room) {
           ? { code: 'exempt', label: 'В ізоляції', detail: 'Активні дії недоступні' }
           : { code: publicActions.length ? 'done' : 'optional', label: publicActions.length ? 'Є виконані дії' : (PHASE_DEFINITIONS[phase]?.label || 'Фаза дій'), detail: publicActions.join(' · ') || 'Дії необов’язкові' };
     } else if (phase === 'event') {
-      phaseState = !canVote
-        ? { code: 'exempt', label: 'Не голосує', detail: !active ? 'Поза сховищем' : detained ? 'Ізоляція' : 'Без права голосу' }
+      const eventEligible = eventDecisionEligible(room, player);
+      const hostDecision = eventDecisionPolicy(room) === 'host';
+      phaseState = !eventEligible
+        ? { code: 'exempt', label: hostDecision ? 'Участь в обговоренні' : 'Не голосує', detail: hostDecision ? 'Рішення кризи підтверджує хост' : !active ? 'Поза сховищем' : detained ? 'Ізоляція' : 'Без права голосу' }
         : eventVoted
-          ? { code: 'done', label: 'Голос подано', detail: 'Вибір приховано' }
-          : { code: 'pending', label: 'Очікується голос', detail: 'Рішення ще не подано' };
+          ? { code: 'done', label: hostDecision ? 'Рішення обрано' : 'Голос подано', detail: hostDecision ? 'Хост може підрахувати кризу' : 'Вибір приховано' }
+          : { code: 'pending', label: hostDecision ? 'Очікується рішення хоста' : 'Очікується голос', detail: 'Рішення ще не подано' };
     } else if (phase === 'elimination') {
       const runoffActive = Boolean(game.runoff?.status === 'voting' && game.runoff?.round === game.round);
       const judgementComplete = eliminationVoted && (!appealsRequired || returnVoted);
@@ -3131,7 +3710,7 @@ function refreshExpeditionOffers(room, force = false) {
     return room.game.expeditionOfferIds;
   }
   const pool = expeditionPool(room);
-  room.game.expeditionOfferIds = shuffled(pool).slice(0, Math.min(EXPEDITION_OFFER_COUNT, pool.length)).map((item) => item.id);
+  room.game.expeditionOfferIds = chooseContentEntries(pool, Math.min(EXPEDITION_OFFER_COUNT, pool.length), room.settings.absurdity).map((item) => item.id);
   room.game.expeditionOfferRound = currentRound;
   return room.game.expeditionOfferIds;
 }
@@ -3140,11 +3719,78 @@ function availableExpeditions(room) {
   const ids = new Set(refreshExpeditionOffers(room));
   return all.filter((item) => ids.has(item.id));
 }
+function publicTutorialState(room, requester) {
+  if (!tutorialEnabled(room) || !room.game) return null;
+  const phase = room.game.phase || "final";
+  const round = Math.min(2, Math.max(1, Number(room.game.round || 1)));
+  const stepIndex = TUTORIAL_GUIDE_STEPS.findIndex((item) => item.phase === phase && (phase === "final" || item.round === round));
+  const step = TUTORIAL_GUIDE_STEPS[stepIndex >= 0 ? stepIndex : TUTORIAL_GUIDE_STEPS.length - 1];
+  const privateCharacterData = requester.character || {};
+  const revealDone = Number(privateCharacterData.revealsUsedRound || 0) >= Number(room.settings.revealsPerRound || 1) || !requester.active || isDetained(room, requester);
+  const eventHostDecision = eventDecisionPolicy(room) === "host";
+  const eventEligible = eventDecisionEligible(room, requester);
+  const eventVoted = Boolean(room.game.eventVotes?.[requester.id]) || !eventEligible;
+  const judgementVoted = Boolean(room.game.eliminationVotes?.[requester.id]) || !requester.active || isDetained(room, requester) || isSilenced(room, requester);
+  const checklist = [];
+  let required = false;
+  if (phase === "reveal") {
+    checklist.push({ label: "Переглянути приватну картку", status: "current" });
+    checklist.push({ label: "Відкрити одну запропоновану характеристику", status: revealDone ? "done" : "pending" });
+    required = !revealDone;
+  } else if (phase === "discussion") {
+    checklist.push({ label: "Порівняти відкриті характеристики", status: "current" });
+    checklist.push({ label: "Перевірити потреби й ресурси сховища", status: "current" });
+  } else if (phase === "event") {
+    checklist.push({ label: eventHostDecision ? (eventEligible ? "Обрати рішення кризи як хост" : "Обговорити варіанти з хостом") : "Подати голос за рішення кризи", status: eventVoted ? "done" : "pending" });
+    checklist.push({ label: "Переглянути пояснення шансу й наслідків", status: room.game.event?.resolved ? "done" : "waiting" });
+    required = eventEligible && !eventVoted;
+  } else if (phase === "elimination") {
+    checklist.push({ label: "Обрати санкцію, ціль або «Без санкцій»", status: judgementVoted ? "done" : "pending" });
+    checklist.push({ label: "Переглянути відкритий протокол", status: room.game.judgementReport ? "done" : "waiting" });
+    required = !judgementVoted;
+  } else if (phase === "round_end") {
+    checklist.push({ label: "Переглянути журнал причин", status: "current" });
+    checklist.push({ label: round === 1 ? "Перейти до другого раунду" : "Завершити навчальну партію", status: requester.id === room.hostPlayerId ? "pending" : "waiting" });
+  } else if (phase === "final") {
+    checklist.push({ label: "Базовий цикл гри пройдено", status: "done" });
+    checklist.push({ label: "Переглянути результат громади й персонажа", status: "current" });
+  }
+  let hostNote = null;
+  if (requester.id === room.hostPlayerId) {
+    if (phase === "event" && !room.game.event?.resolved) hostNote = eventHostDecision
+      ? (Boolean(room.game.eventVotes?.[requester.id]) ? "Рішення обрано. Натисніть «Підрахувати кризу»." : "Обговоріть варіанти з групою та оберіть рішення як хост.")
+      : (eventDecisionVoters(room).every((player) => room.game.eventVotes?.[player.id])
+        ? "Усі доступні голоси подано. Натисніть «Підрахувати кризу»."
+        : "Дочекайтеся голосів, а потім підрахуйте кризу.");
+    else if (phase === "elimination" && !room.game.judgementReport) hostNote = "Дочекайтеся рішень і натисніть підрахунок громади. За нічиєї гра проведе переголосування.";
+    else if (phase === "round_end") hostNote = round === 1 ? "Натисніть «Завершити раунд», щоб перейти до другого навчального раунду." : "Натисніть «Завершити раунд», щоб сформувати фінал.";
+    else if (phase !== "final") hostNote = "Коли група завершить поточний крок, переведіть партію до наступної фази.";
+  }
+  return {
+    enabled: true,
+    version: 1,
+    step: Math.max(1, stepIndex + 1),
+    totalSteps: TUTORIAL_GUIDE_STEPS.length,
+    progressPercent: Math.round((Math.max(0, stepIndex) / Math.max(1, TUTORIAL_GUIDE_STEPS.length - 1)) * 100),
+    title: step.title,
+    text: step.text,
+    targetTab: step.targetTab,
+    button: step.button,
+    required,
+    checklist,
+    hostNote,
+    firstRoundWithoutSanction: round === 1,
+    completed: phase === "final"
+  };
+}
+
 function buildState(room, requester) {
   const game = room.game ? {
     phase: room.game.phase,
     phaseInfo: { code: room.game.phase, ...(PHASE_DEFINITIONS[room.game.phase] || {}) },
-    phaseLoop: publicPhaseLoop(room.settings),
+    phaseLoop: publicPhaseLoop(room),
+    tutorial: publicTutorialState(room, requester),
+    campaignLegacy: publicCampaignLegacy(room, requester),
     round: room.game.round,
     maxRounds: room.game.maxRounds,
     catastrophe: publicCatastrophe(room),
@@ -3190,6 +3836,7 @@ function buildState(room, requester) {
       id: room.game.event.id,
       title: room.game.event.title,
       description: room.game.event.description,
+      level: entryLevel(room.game.event),
       choices: room.game.event.choices.map((choice) => {
         const baseChance = clamp(Number(choice.success || 0), 0.1, 0.95);
         const band = chanceBand(baseChance);
@@ -3215,7 +3862,11 @@ function buildState(room, requester) {
       resultText: room.game.event.resultText || null,
       reasonReport: room.game.event.reasonReport || null,
       winningChoiceId: room.game.event.winningChoiceId || null,
-      voteCount: Object.keys(room.game.eventVotes || {}).length
+      decisionPolicy: eventDecisionPolicy(room),
+      decisionPolicyLabel: eventDecisionPolicy(room) === "host" ? "Після обговорення рішення підтверджує хост" : "Таємне голосування активних гравців",
+      canVote: eventDecisionEligible(room, requester),
+      requiredCount: eventDecisionVoters(room).length,
+      voteCount: eventDecisionVoters(room).filter((player) => Boolean(room.game.eventVotes?.[player.id])).length
     } : null,
     eventVote: room.game.eventVotes?.[requester.id] || null,
     eliminationVote: room.game.eliminationVotes?.[requester.id] || null,
@@ -3271,10 +3922,9 @@ function buildState(room, requester) {
           id: item.id,
           name: item.name,
           description: item.description,
+          level: entryLevel(item),
           difficulty: item.difficulty,
-          tags: [...(item.tags || [])],
-          requiredSkills: (item.tags || []).map((tag) => ACTION_TAG_LABELS[tag] || tag),
-          preview: { label: band.label, tone: band.tone, explanation: "Оцінка без урахування вибраних учасників. Двоє людей і релевантні компетенції можуть підвищити шанс." }
+          preview: { label: band.label, tone: band.tone, explanation: "Оцінка без урахування вибраних учасників. Опис маршруту підказує, який досвід може допомогти; точні системні теги лишаються прихованими." }
         };
       }) : [],
       repairPreviews: requester.id === room.hostPlayerId && (room.game.features || publicModeFeatures(room.settings)).operations
@@ -3298,6 +3948,7 @@ function buildState(room, requester) {
     version: VERSION,
     revision: room.revision,
     code: room.code,
+    generation: publicGenerationState(room),
     settings: {
       ...room.settings,
       contentPackName: room.game?.contentPack?.name || platform.getPack(room.settings.contentPackId)?.name || null,
@@ -3326,7 +3977,8 @@ function createEvent(room) {
   const candidates = eventPool(room);
   const recentIds = room.game.log.filter((line) => line.startsWith("Подія:")).map((line) => line.slice(7).trim());
   const unused = candidates.filter((event) => !recentIds.includes(event.title));
-  const base = room.game.preparedEvent || sample(unused.length ? unused : candidates);
+  const tutorialEvent = tutorialEnabled(room) ? TUTORIAL_EVENTS[Math.min(2, Number(room.game.round || 1))] : null;
+  const base = tutorialEvent || room.game.preparedEvent || chooseContentEntry(unused.length ? unused : candidates, room.settings.absurdity);
   room.game.preparedEvent = null;
   room.game.event = JSON.parse(JSON.stringify(base));
   room.game.eventVotes = {};
@@ -3468,10 +4120,13 @@ function resolveEvent(room) {
   const event = room.game.event;
   if (!event || event.resolved) throw new Error("Подія відсутня або вже завершена.");
   const actives = activePlayers(room);
-  if (!Object.keys(room.game.eventVotes).length) throw new Error("Ще немає жодного голосу.");
+  const voters = eventDecisionVoters(room);
+  if (!voters.some((player) => room.game.eventVotes?.[player.id])) {
+    throw new Error(eventDecisionPolicy(room) === "host" ? "Хост ще не обрав рішення кризи." : "Ще немає жодного голосу.");
+  }
   const tally = {};
   let abstentions = 0;
-  for (const player of actives) {
+  for (const player of voters) {
     const choiceId = room.game.eventVotes[player.id];
     if (!choiceId) continue;
     if (choiceId === SKIP_VOTE) {
@@ -3497,7 +4152,7 @@ function resolveEvent(room) {
   const settingBonus = Number(room.game.settingModifiers?.eventLuckBonus || 0);
   const luckBonus = preparationBonus + settingBonus;
   const finalChance = clamp(choice.success + teamBonus + luckBonus, 0.1, 0.95);
-  const roll = Math.random();
+  const roll = random();
   const success = roll < finalChance;
   room.game.eventLuckBoost = 0;
   let effects = success ? choice.good : choice.bad;
@@ -3613,12 +4268,16 @@ function resolveReturnVotes(room) {
   room.game.returnVotes = {};
 }
 function applySanction(room, target, sanction) {
+  room.game.sanctionHistory ||= [];
   if (sanction === "detention") {
     target.detainedUntilRound = room.game.round + 1;
-    room.game.log.push(`${target.name} ізольовано на наступний раунд: без розкриття, здібностей, експедицій, ремонту й голосування.`);
+    room.game.shelter.resources.energy = clamp(Number(room.game.shelter.resources.energy || 0) - 3, 0, 100);
+    room.game.shelter.resources.morale = clamp(Number(room.game.shelter.resources.morale || 0) - 2, 0, 100);
+    room.game.log.push(`${target.name} ізольовано на наступний раунд: без розкриття, здібностей, експедицій, ремонту й голосування. Утримання ізоляції коштує 3 енергії та 2 моралі.`);
   } else if (sanction === "silence") {
     target.silencedUntilRound = room.game.round + 1;
-    room.game.log.push(`${target.name} позбавлено права голосу на наступний раунд.`);
+    target.character.revealInfluence = clamp(Number(target.character.revealInfluence || 0) + 1, 0, 3);
+    room.game.log.push(`${target.name} позбавлено участі в колективних рішеннях на наступний раунд, але отримує 1 вплив як компенсацію.`);
   } else {
     target.active = false;
     target.eliminatedRound = room.game.round;
@@ -3631,6 +4290,8 @@ function applySanction(room, target, sanction) {
       ? `${target.name} залишає сховище за рішенням громади та отримує зовнішню роль «${target.outsideRole.name}».`
       : `${target.name} залишає сховище за рішенням громади.`);
   }
+  room.game.sanctionHistory.push({ round: room.game.round, targetId: target.id, targetName: target.name, sanction });
+  room.game.sanctionHistory = room.game.sanctionHistory.slice(-20);
 }
 function resolveElimination(room) {
   const game = room.game;
@@ -3669,7 +4330,7 @@ function resolveElimination(room) {
     if (targetId !== SKIP_VOTE) {
       target = room.players.find((item) => item.id === targetId && item.active);
       if (!target) ignoredReason = "Ціль уже недоступна";
-      else if (target.id === voter.id) ignoredReason = "Самоголосування не враховується";
+      else if (target.id === voter.id && !(room.settings.soloTestMode === true && voters.length === 1)) ignoredReason = "Самоголосування не враховується";
       else if (target.character.protectedRound === game.round) ignoredReason = "Ціль мала активний захист";
     }
     if (!ignoredReason && activeRunoff && !allowedRunoffKeys.has(key)) ignoredReason = "Варіант не входив до повторного голосування";
@@ -3768,6 +4429,15 @@ function resolveElimination(room) {
         game.log.push(baseReport.outcome.detail);
       }
     }
+  }
+  const exileApplied = baseReport.outcome?.type === "sanction" && baseReport.outcome?.sanction === "exile";
+  game.roundsWithoutExile = exileApplied ? 0 : Number(game.roundsWithoutExile || 0) + 1;
+  const excess = Math.max(0, activePlayers(room).length - Number(room.settings.capacity || activePlayers(room).length));
+  if (!exileApplied && excess > 0) {
+    const pressure = Math.min(8, excess * Math.max(1, game.roundsWithoutExile));
+    game.shelter.resources.food = clamp(Number(game.shelter.resources.food || 0) - pressure, 0, 100);
+    game.shelter.resources.water = clamp(Number(game.shelter.resources.water || 0) - pressure, 0, 100);
+    game.log.push(`Відсутність вигнання підвищила тиск місткості: їжа й вода −${pressure}.`);
   }
   game.runoff = null;
   game.eliminationVotes = {};
@@ -3922,7 +4592,7 @@ function provideCare(room, player, body, free = false, forcedPotency = null) {
   const successChance = free
     ? clamp(0.55 + potency * 0.10 + competenceBonus + medicBonus + triageBonus + observationBonus - severityPenalty, 0.35, 0.99)
     : assessment.chance;
-  const roll = Math.random();
+  const roll = random();
   const success = roll < successChance;
   let severityDrop = 0;
   let complicationText = "";
@@ -4136,7 +4806,7 @@ function launchExpedition(room, player, body) {
   const preparationBonus = Number(room.game.expeditionBoost || 0);
   const chance = clamp(0.35 + competenceBonus + teamBonus + equipmentBonus + communicationsBonus + settingBonus - difficultyPenalty + preparationBonus, 0.12, 0.92);
   const autoSuccess = Boolean(room.game.expeditionAutoSuccess);
-  const roll = autoSuccess ? 0 : Math.random();
+  const roll = autoSuccess ? 0 : random();
   const success = autoSuccess || roll < chance;
   room.game.expeditionRounds.push(room.game.round);
   const rawChanges = success ? location.success : location.failure;
@@ -4159,7 +4829,7 @@ function launchExpedition(room, player, body) {
   if (notes) text += ` Наслідки: ${notes}.`;
   const secondary = [];
   if (success && location.asset) {
-    const assetRoll = Math.random();
+    const assetRoll = random();
     const foundAsset = assetRoll < 0.5;
     secondary.push({ label: "Додаткова знахідка", result: foundAsset ? `Знайдено: ${location.asset.name}` : "Окремої знахідки немає", rollPercent: Math.round(assetRoll * 100), thresholdPercent: 50 });
     if (foundAsset) {
@@ -4168,7 +4838,7 @@ function launchExpedition(room, player, body) {
     }
   }
   if (!success && !room.game.expeditionNoInjury) {
-    const rescueRoll = communicationRescueChance > 0 ? Math.random() : 1;
+    const rescueRoll = communicationRescueChance > 0 ? random() : 1;
     const rescuedByCommunications = communicationRescueChance > 0 && rescueRoll < communicationRescueChance;
     if (communicationRescueChance > 0) secondary.push({ label: "Евакуація через зв’язок", result: rescuedByCommunications ? "Координатори вивели групу з небезпечної зони" : "Канал зв’язку не встиг запобігти ризику", rollPercent: Math.round(rescueRoll * 100), thresholdPercent: Math.round(communicationRescueChance * 100) });
     if (rescuedByCommunications) {
@@ -4178,7 +4848,7 @@ function launchExpedition(room, player, body) {
       const vulnerable = [];
       for (const member of players) {
         const defense = Number(member.character.permanentDefense || 0);
-        const defenseRoll = defense > 0 ? Math.random() : 1;
+        const defenseRoll = defense > 0 ? random() : 1;
         if (!defense || defenseRoll > defense) vulnerable.push(member);
         secondary.push({ label: `Захист: ${member.name}`, result: !defense ? "Постійного захисту немає" : defenseRoll <= defense ? "Захист спрацював" : "Захист не спрацював", rollPercent: Math.round(defenseRoll * 100), thresholdPercent: Math.round(defense * 100) });
       }
@@ -4264,7 +4934,7 @@ function repairModule(room, player, body) {
   const supportBonus = Math.min(0.16, repairSupport.length * 0.04);
   const injuryThreshold = Math.max(0.10, 0.25 - Math.min(0.15, repairSupport.length * 0.05));
   const chance = clamp(0.42 + competenceBonus + urgency + supportBonus, 0.16, 0.93);
-  const roll = Math.random();
+  const roll = random();
   const success = roll < chance;
   let injuryRoll = null;
   let text;
@@ -4276,7 +4946,7 @@ function repairModule(room, player, body) {
   } else {
     module.condition = clamp(module.condition - randomInt(2, 7), 0, 100);
     worker.character.stress = clamp((worker.character.stress || 0) + 2, 0, 5);
-    injuryRoll = Math.random();
+    injuryRoll = random();
     if (injuryRoll < injuryThreshold) worker.character.injury = clamp((worker.character.injury || 0) + 1, 0, 5);
     text = `${worker.name} не справляється з ремонтом модуля «${module.name}». Стан: ${before}% → ${module.condition}%.`;
   }
@@ -4328,7 +4998,7 @@ function progressMedicalConditions(room) {
     const base = MEDICAL.severityMeta(condition.severity).progression;
     const untreatedChance = clamp(base + medicinePressure + stressPressure, 0.08, 0.72);
     const chance = quarantineProtected ? 0 : observed ? untreatedChance * 0.5 : (treated ? Math.max(0.02, base * 0.2) : untreatedChance);
-    if (Math.random() < chance && condition.severity < 5) {
+    if (random() < chance && condition.severity < 5) {
       const before = condition.severity;
       condition.severity += 1;
       condition.worsenedRounds = (condition.worsenedRounds || 0) + 1;
@@ -4581,6 +5251,7 @@ function finalVictorySummaryForPlayer(room, player) {
 
 function finishGame(room) {
   const game = room.game;
+  if (game.tutorial) game.tutorial.completed = true;
   const survivors = activePlayers(room);
   const resources = game.shelter.resources;
   const moduleAverage = Math.round(game.shelter.modules.reduce((sum, module) => sum + module.condition, 0) / game.shelter.modules.length);
@@ -4594,7 +5265,9 @@ function finishGame(room) {
   const operationBonus = game.features?.operations
     ? Math.min(12, (game.expeditionHistory || []).filter((item) => item.success).length * 3 + (game.repairHistory || []).filter((item) => item.success).length * 2)
     : 0;
-  let score = clamp(Math.round(resourceAverage * 0.45 + moduleAverage * 0.31 + Math.min(10, game.shelter.allies * 2) + operationBonus - socialPenalty - medicalPenalty), 0, 100);
+  const preliminaryMysteryOutcome = detectiveMysteryResult(room);
+  const directOutcome = evaluateDirectOutcome(room, preliminaryMysteryOutcome);
+  let score = directOutcome.directScore;
   let verdict = "Критичний фінал";
   let description = "Сховище формально пережило кризовий період, однак його системи, медицина й внутрішня довіра перебувають на межі. Наступна велика аварія може стати останньою.";
   if (score >= 78) {
@@ -4614,7 +5287,6 @@ function finishGame(room) {
   if (criticalPatients.length) description += ` ${criticalPatients.length} мешканців залишаються у критичному медичному стані.`;
 
   const totalRevealed = room.players.reduce((sum, player) => sum + Object.keys(player.character.revealed).length, 0);
-  const preliminaryMysteryOutcome = detectiveMysteryResult(room);
   const personalGoals = room.players.map((player) => ({
     playerId: player.id,
     name: player.name,
@@ -4706,7 +5378,7 @@ function finishGame(room) {
     `Початкове укриття: ${game.shelter.title}, ${game.shelter.areaM2.toLocaleString("uk-UA")} м², ${game.shelter.roomCount} приміщень, проєктна місткість — ${game.shelter.residentCapacity || room.settings.capacity}; до фінальної групи відібрано до ${room.settings.capacity} людей.`,
     ...keyLog.slice(-12),
     `Фінальний склад: ${survivors.length} мешканців і ${game.shelter.allies} зовнішніх союзників.`,
-    `Підсумкова оцінка: ${verdict}, ${score}/100. ${description}`
+    `Оцінка контрольованих рішень: ${score}/100. ${description}`
   ];
 
   const expeditionSuccesses = (game.expeditionHistory || []).filter((item) => item.success).length;
@@ -4738,19 +5410,22 @@ function finishGame(room) {
   if (resources.morale < 55 || hiddenThreats.length) priorities.push("Провести внутрішню перевірку й відновити довіру між мешканцями.");
   if (!priorities.length) priorities.push("Перейти від аварійного виживання до довгострокового плану поселення й підготовки наступників.");
 
-  const scoreBreakdown = [
-    { label: "Запаси", value: Math.round(resourceAverage * 0.45), max: 45, tone: resourceAverage >= 60 ? "good" : resourceAverage >= 40 ? "warn" : "bad" },
-    { label: "Системи", value: Math.round(moduleAverage * 0.31), max: 31, tone: moduleAverage >= 65 ? "good" : moduleAverage >= 45 ? "warn" : "bad" },
-    { label: "Союзники", value: Math.min(10, game.shelter.allies * 2), max: 10, tone: game.shelter.allies ? "good" : "neutral" },
-    ...(game.features?.operations ? [{ label: "Експедиції та ремонти", value: operationBonus, max: 12, tone: operationBonus >= 6 ? "good" : operationBonus >= 3 ? "warn" : "neutral" }] : []),
-    { label: "Соціальні ризики", value: -socialPenalty, max: 0, tone: socialPenalty ? "bad" : "good" },
-    { label: "Медичні ризики", value: -medicalPenalty, max: 0, tone: medicalPenalty ? "bad" : "good" }
-  ];
+  const scoreBreakdown = directOutcome.scoreBreakdown.map((item) => ({ ...item }));
+  analysis.unshift({
+    title: `Оцінка рішень · ${publicVictoryRules(room.settings).modeName}`,
+    status: `${directOutcome.directScore}/100`,
+    text: directOutcome.competence.labelsMissing.length
+      ? `Формула режиму врахувала фактичні рішення групи. Непокриті критичні напрями: ${directOutcome.competence.labelsMissing.join(", ")}.`
+      : `Формула режиму врахувала фактичні рішення групи; усі критичні напрями сценарію покрито.`
+  });
 
   const longTermSimulation = simulateLongTerm(room, score);
-  score = longTermSimulation.finalScore;
-  verdict = longTermSimulation.verdict;
-  description = longTermSimulation.description;
+  const forecastCenter = Number(longTermSimulation.finalScore ?? score);
+  const forecastRange = {
+    min: clamp(Math.round(forecastCenter - 4), 0, 100),
+    max: clamp(Math.round(forecastCenter + 4), 0, 100),
+    center: clamp(Math.round(forecastCenter), 0, 100)
+  };
   analysis.unshift({
     title: `Результат через ${longTermSimulation.horizonYears} років`,
     status: longTermSimulation.verdict,
@@ -4804,13 +5479,10 @@ function finishGame(room) {
       return { id: item.playerId, name: item.name, role: source?.character?.role?.name || "Мешканець" };
     });
 
-  scoreBreakdown.push({
-    label: "Довгострокова симуляція",
-    value: longTermSimulation.scoreAdjustment,
-    max: 0,
-    tone: longTermSimulation.scoreAdjustment > 0 ? "good" : longTermSimulation.scoreAdjustment < 0 ? "bad" : "neutral"
-  });
+  chronology.push(`Результат партії за контрольованими рішеннями: ${score}/100. Окремий прогноз через ${longTermSimulation.horizonYears} років: ${forecastRange.min}–${forecastRange.max}/100; він не змінює результат партії.`);
   const summaryStats = [
+    { label: "Результат партії", value: `${directOutcome.directScore}/100`, note: `Формула режиму: ${directOutcome.mode}` },
+    { label: "Прогноз через роки", value: `${forecastRange.min}–${forecastRange.max}`, note: "Епілог, не складова бала" },
     { label: "Населення", value: `${longTermSimulation.demography.endPopulation}`, note: `На старті симуляції: ${longTermSimulation.demography.startPopulation}` },
     { label: "Часовий горизонт", value: `${longTermSimulation.horizonYears} р.`, note: longTermSimulation.settlement.stage },
     longTermSimulation.demography.modeled
@@ -4824,10 +5496,6 @@ function finishGame(room) {
 
   const mysteryOutcome = preliminaryMysteryOutcome;
   if (mysteryOutcome) {
-    const delta = mysteryOutcome.fullySolved ? 12 : mysteryOutcome.solved ? 8 : mysteryOutcome.correctAccusation ? -3 : -10;
-    score = clamp(score + delta, 0, 100);
-    const mysteryLabel = mysteryOutcome.fullySolved ? "Справу розкрито повністю" : mysteryOutcome.solved ? "Організатора доведено" : mysteryOutcome.correctAccusation ? "Правильна підозра без достатніх доказів" : "Хибне фінальне звинувачення";
-    scoreBreakdown.push({ label: mysteryLabel, value: delta, max: 12, tone: delta > 0 ? "good" : "bad" });
     if (mysteryOutcome.solved) {
       strengths.unshift(`Центральну справу доведено: організатора ${mysteryOutcome.culpritName} правильно названо й зібрано ${mysteryOutcome.evidenceStrength}/${mysteryOutcome.requiredEvidence} необхідних ланок доказів.`);
       description += " Група не лише назвала організатора, а й побудувала достатній ланцюг доказів.";
@@ -4863,6 +5531,22 @@ function finishGame(room) {
     verdict,
     description,
     score,
+    directScore: directOutcome.directScore,
+    simulationImpact: 0,
+    forecastRange,
+    scoreLayers: {
+      directScore: directOutcome.directScore,
+      finalScore: directOutcome.directScore,
+      forecastCenter: forecastRange.center,
+      forecastMin: forecastRange.min,
+      forecastMax: forecastRange.max,
+      forecastOnly: true,
+      mode: directOutcome.mode
+    },
+    directConsequences: directOutcome.directConsequences,
+    simulationAssumptions: longTermSimulation.simulationAssumptions,
+    balanceMetrics: directOutcome.metrics,
+    competenceAudit: directOutcome.competence,
     survivors: endOriginalSurvivors,
     moduleAverage,
     resourceAverage,
@@ -4960,8 +5644,11 @@ function advancePhase(room) {
   }
   if (isTimedPhase(current)) pauseDiscussionTimer(room);
   if (current === "round_end") {
+    if (game.campaignLegacy?.dilemma?.status === "open" && Number(game.round || 1) >= Number(game.campaignLegacy.dilemma.dueRound || 1)) {
+      resolveCampaignLegacy(room, { automatic: true, force: true });
+    }
     consumeRound(room);
-    const selectionComplete = Boolean(modeConfig(room.settings).endWhenCapacityReached && game.features?.elimination && activePlayers(room).length <= room.settings.capacity && (room.settings.setting !== "detective" || game.round >= game.maxRounds));
+    const selectionComplete = Boolean(room.settings.soloTestMode !== true && modeConfig(room.settings).endWhenCapacityReached && game.features?.elimination && activePlayers(room).length <= room.settings.capacity && (room.settings.setting !== "detective" || game.round >= game.maxRounds));
     if (selectionComplete || game.round >= game.maxRounds) {
       finishGame(room);
       return;
@@ -5147,7 +5834,8 @@ function useAbility(room, player, body) {
     game.log.push(`${player.name} відкриває аварійний запас: їжа +12, вода +12.`);
   } else if (id === "double_vote") {
     character.voteBoost = true;
-    game.log.push(`${player.name} активує вирішальний голос.`);
+    character.stress = clamp((character.stress || 0) + 1, 0, 5);
+    game.log.push(`${player.name} активує вирішальний голос, але напруга підвищує його / її стрес.`);
   } else if (id === "truth") {
     const target = abilityTargetPlayer(room, player, body, { allowSelf: false });
     const hidden = characterKeysForRoom(room).filter((key) => !target.character.revealed[key]);
@@ -5156,7 +5844,8 @@ function useAbility(room, player, body) {
   } else if (id === "protect") {
     const target = abilityTargetPlayer(room, player, body);
     target.character.protectedRound = game.round;
-    game.log.push(`${player.name} захищає гравця ${target.name} від вигнання в цьому раунді.`);
+    character.stress = clamp((character.stress || 0) + 1, 0, 5);
+    game.log.push(`${player.name} захищає гравця ${target.name} від вигнання в цьому раунді й бере частину напруги на себе.`);
   } else if (id === "repair") {
     const module = abilityTargetModule(room, body);
     module.condition = clamp(module.condition + 18, 0, 100);
@@ -5189,11 +5878,16 @@ function useAbility(room, player, body) {
   } else if (id === "persuasion") {
     const target = abilityTargetPlayer(room, player, body, { allowSelf: false });
     game.forcedEliminationVotes[target.id] = (game.forcedEliminationVotes[target.id] || 0) + 1;
-    game.log.push(`${player.name} створює додатковий голос проти гравця ${target.name} у найближчому голосуванні.`);
+    character.stress = clamp((character.stress || 0) + 1, 0, 5);
+    applyEffects(room, { morale: -2 });
+    game.log.push(`${player.name} створює додатковий голос проти гравця ${target.name}; тиск знижує мораль громади.`);
   } else if (id === "intimidation") {
     const target = abilityTargetPlayer(room, player, body, { allowSelf: false });
     target.character.silencedRound = game.round;
-    game.log.push(`${player.name} залякує гравця ${target.name}: він / вона не може голосувати цього раунду.`);
+    target.character.stress = clamp((target.character.stress || 0) + 1, 0, 5);
+    character.stress = clamp((character.stress || 0) + 1, 0, 5);
+    applyEffects(room, { morale: -4 });
+    game.log.push(`${player.name} залякує гравця ${target.name}: він / вона не бере участі в рішеннях цього раунду, а мораль громади падає.`);
   } else if (id === "support") {
     const target = abilityTargetPlayer(room, player, body);
     boostOperation(target, 0.10);
@@ -5215,7 +5909,8 @@ function useAbility(room, player, body) {
     const target = abilityTargetPlayer(room, player, body, { allowSelf: false });
     target.character.cannotVoteAgainstId = player.id;
     target.character.cannotVoteAgainstUntilRound = game.round;
-    game.log.push(`${target.name} дає гравцеві ${player.name} клятву не голосувати проти нього / неї цього раунду.`);
+    character.stress = clamp((character.stress || 0) + 1, 0, 5);
+    game.log.push(`${target.name} дає гравцеві ${player.name} клятву не голосувати проти нього / неї цього раунду; підтримання союзу виснажує користувача.`);
   } else if (id === "betrayal") {
     const target = abilityTargetPlayer(room, player, body, { allowSelf: false });
     target.character.stress = clamp((target.character.stress || 0) + 2, 0, 5);
@@ -5244,8 +5939,8 @@ function useAbility(room, player, body) {
 
   // Запаси
   } else if (id === "food_cache") {
-    applyEffects(room, { food: 25 });
-    game.log.push(`${player.name} відкриває таємний склад їжі (+25).`);
+    applyEffects(room, { food: 18 });
+    game.log.push(`${player.name} відкриває таємний склад їжі (+18).`);
   } else if (id === "water_purifier") {
     applyEffects(room, { water: 20 });
     game.log.push(`${player.name} запускає портативний очищувач води (+20).`);
@@ -5314,8 +6009,8 @@ function useAbility(room, player, body) {
   // Техніка й оборона
   } else if (id === "engineer") {
     const module = [...game.shelter.modules].sort((a, b) => a.condition - b.condition)[0];
-    module.condition = clamp(module.condition + 30, 0, 100);
-    game.log.push(`${player.name} відновлює найслабший модуль «${module.name}» (+30%).`);
+    module.condition = clamp(module.condition + 24, 0, 100);
+    game.log.push(`${player.name} відновлює найслабший модуль «${module.name}» (+24%).`);
   } else if (id === "overclock") {
     const module = abilityTargetModule(room, body);
     if (game.shelter.resources.energy < 5) throw new Error("Для розгону потрібно 5 енергії.");
@@ -5326,8 +6021,8 @@ function useAbility(room, player, body) {
     applyEffects(room, { energy: 20 });
     game.log.push(`${player.name} відновлює електромережу (+20 енергії).`);
   } else if (id === "plumbing") {
-    applyEffects(room, { water: 25 });
-    game.log.push(`${player.name} ремонтує водний контур (+25 води).`);
+    applyEffects(room, { water: 18 });
+    game.log.push(`${player.name} ремонтує водний контур (+18 води).`);
   } else if (id === "automation") {
     const module = abilityTargetModule(room, body);
     module.condition = clamp(module.condition + 15, 0, 100);
@@ -5388,8 +6083,9 @@ function useAbility(room, player, body) {
     const target = abilityTargetPlayer(room, player, body, { allowSelf: false });
     const hidden = characterKeysForRoom(room).filter((key) => !target.character.revealed[key]);
     if (!hidden.length) throw new Error("У цього гравця вже все відкрито.");
-    for (const key of hidden) target.character.revealed[key] = true;
-    game.log.push(`${player.name} розкриває всі характеристики гравця ${target.name}.`);
+    const revealed = shuffled(hidden).slice(0, 3);
+    for (const key of revealed) target.character.revealed[key] = true;
+    game.log.push(`${player.name} розкриває три характеристики гравця ${target.name}: ${revealed.map((key) => characterKeyLabel(room, key)).join(", ")}.`);
   } else if (id === "mimicry") {
     const currentMode = modeConfig(room.settings);
     const choices = COMMON.abilities.filter((candidate) => abilityAllowedForMode(candidate, currentMode) && candidate.id !== "mimicry" && !String(candidate.id).startsWith("passive_") && candidate.id !== character.ability.id);
@@ -5413,15 +6109,17 @@ function useAbility(room, player, body) {
     game.log.push(`${player.name} домовляється з зовнішньою групою: союзники +1, мораль +8.`);
   } else if (id === "prophet") {
     const candidates = eventPool(room);
-    const future = sample(candidates);
+    const future = chooseContentEntry(candidates, room.settings.absurdity);
     game.preparedEvent = future ? JSON.parse(JSON.stringify(future)) : null;
     character.privateNotes.push(future ? `Передбачення: наступна подія — «${future.title}».` : "Передбачення залишилося неясним.");
     game.log.push(`${player.name} отримує передчуття наступної події.`);
   } else if (id === "charm") {
     const target = abilityTargetPlayer(room, player, body, { allowSelf: false });
     target.character.cannotVoteAgainstId = player.id;
-    target.character.cannotVoteAgainstUntilRound = game.maxRounds + 10;
-    game.log.push(`${target.name} більше не може голосувати проти гравця ${player.name}.`);
+    target.character.cannotVoteAgainstUntilRound = Math.min(game.maxRounds, game.round + 1);
+    character.stress = clamp((character.stress || 0) + 1, 0, 5);
+    applyEffects(room, { morale: -3 });
+    game.log.push(`${target.name} не може голосувати проти гравця ${player.name} до завершення наступного раунду; маніпуляція знижує мораль громади.`);
   } else if (id === "legend") {
     applyEffects(room, { morale: 10 });
     character.stress = clamp((character.stress || 0) + 1, 0, 5);
@@ -5440,9 +6138,9 @@ function useAbility(room, player, body) {
     character.injury = Math.max(0, (character.injury || 0) - 1);
     game.log.push(`${player.name} встановлює кібернетичний імплант і стає ефективнішим / ефективнішою.`);
   } else if (id === "clone") {
-    game.expeditionAutoSuccess = true;
+    game.expeditionBoost = Math.max(game.expeditionBoost || 0, 0.30);
     game.expeditionNoInjury = true;
-    game.log.push(`${player.name} готує клона для безпечного виконання наступної експедиції.`);
+    game.log.push(`${player.name} готує клона: наступна експедиція отримує +30% і захист від травм, але успіх не гарантований.`);
 
   // Фентезійні здібності
   } else if (id === "fireball") {
@@ -5456,9 +6154,9 @@ function useAbility(room, player, body) {
     game.eventShield = (game.eventShield || 0) + 2;
     game.log.push(`${player.name} створює магічний бар’єр від двох негативних наслідків.`);
   } else if (["teleport", "portal", "invisibility"].includes(id)) {
-    game.expeditionAutoSuccess = true;
+    game.expeditionBoost = Math.max(game.expeditionBoost || 0, 0.32);
     game.expeditionNoInjury = true;
-    game.log.push(`${player.name} забезпечує безпечне проходження наступної експедиції.`);
+    game.log.push(`${player.name} дає наступній експедиції +32% і захист від травм, але не гарантує успіху.`);
   } else if (id === "scrying") {
     const locations = availableExpeditions(room).slice(0, 3).map((item) => `${item.name} (складність ${item.difficulty})`).join("; ");
     character.privateNotes.push(`Ясновидіння показало маршрути: ${locations || "нічого певного"}.`);
@@ -5479,15 +6177,15 @@ function useAbility(room, player, body) {
     target.character.stress = Math.max(0, (target.character.stress || 0) - 1);
     game.log.push(`${player.name} благословляє гравця ${target.name}.`);
   } else if (id === "raise_dead") {
-    applyEffects(room, { allies: 5 });
+    applyEffects(room, { allies: 2 });
     game.expeditionBoost = Math.max(game.expeditionBoost || 0, 0.15);
-    game.log.push(`${player.name} піднімає п’ятьох скелетів-помічників для громади.`);
+    game.log.push(`${player.name} піднімає двох скелетів-помічників для громади.`);
 
   // Космічні здібності
   } else if (["hyperspace", "warp_drive"].includes(id)) {
-    game.expeditionAutoSuccess = true;
+    game.expeditionBoost = Math.max(game.expeditionBoost || 0, 0.32);
     game.expeditionNoInjury = true;
-    game.log.push(`${player.name} прокладає безпечний надпросторовий маршрут для наступної експедиції.`);
+    game.log.push(`${player.name} прокладає надпросторовий маршрут: +32% до наступної експедиції та захист від травм без гарантованого успіху.`);
   } else if (id === "shield_gen") {
     game.eventShield = (game.eventShield || 0) + 2;
     applyEffects(room, { integrity: 8 });
@@ -5501,12 +6199,12 @@ function useAbility(room, player, body) {
     applyEffects(room, { integrity: 6, energy: 4 });
     game.log.push(`${player.name} притягує до дока корисний вантаж.`);
   } else if (id === "nanotech") {
-    for (const module of game.shelter.modules) module.condition = clamp(module.condition + 30, 0, 100);
-    game.log.push(`${player.name} запускає наноремонт усіх модулів (+30%).`);
+    for (const module of game.shelter.modules) module.condition = clamp(module.condition + 12, 0, 100);
+    game.log.push(`${player.name} запускає наноремонт усіх модулів (+12%).`);
   } else if (id === "android") {
-    game.expeditionAutoSuccess = true;
+    game.expeditionBoost = Math.max(game.expeditionBoost || 0, 0.30);
     game.expeditionNoInjury = true;
-    game.log.push(`${player.name} виділяє андроїда для безпечної наступної місії.`);
+    game.log.push(`${player.name} виділяє андроїда: +30% до наступної місії та захист від травм без гарантованого успіху.`);
   } else if (id === "telepathy") {
     applyEffects(room, { allies: 1, morale: 8 });
     game.log.push(`${player.name} встановлює мирний контакт із чужою цивілізацією.`);
@@ -5538,21 +6236,36 @@ function useAbility(room, player, body) {
 }
 
 
+function gameRuleStatus(message) {
+  return /^(Оберіть|Введіть|Вкажіть|Напишіть|Невідома|Перше відкриття|Цього раунду можна|Seed генерації)/u.test(String(message || "")) ? 400 : 409;
+}
+
+function gameRuleError(message, status = 409) {
+  const error = new Error(message);
+  error.name = "GameRuleError";
+  error.status = status;
+  error.expose = true;
+  return error;
+}
+
 function handleAction(room, player, action, body) {
+  const isolationBlockedActions = new Set(["provide_care", "role_action", "set_operation_support", "launch_expedition", "repair_module", "use_ability", "investigate_case"]);
+  if (room.game && isDetained(room, player) && isolationBlockedActions.has(action)) throw gameRuleError("Ізоляція блокує лікування, ремонт, експедиції, рольові дії та активні здібності до завершення санкції.");
   switch (action) {
     case "ready":
-      if (room.game) throw new Error("Партія вже почалася.");
+      if (room.game) throw gameRuleError("Партія вже почалася.");
       player.ready = Boolean(body.value);
       break;
     case "update_settings": {
-      if (player.id !== room.hostPlayerId) throw new Error("Лише хост може змінювати налаштування кімнати.");
-      if (room.game) throw new Error("Після початку партії базові налаштування вже не змінюються.");
+      if (player.id !== room.hostPlayerId) throw gameRuleError("Лише хост може змінювати налаштування кімнати.");
+      if (room.game) throw gameRuleError("Після початку партії базові налаштування вже не змінюються.");
       const mode = GAME_MODES[body.mode] ? body.mode : (room.settings.mode || "classic");
       const next = {
         mode,
         setting: SETTING_IDS.has(body.setting) ? body.setting : room.settings.setting,
         scenarioMode: SCENARIO_MODES.has(body.scenarioMode) ? body.scenarioMode : (room.settings.scenarioMode || "procedural"),
-        capacity: clamp(Number(body.capacity) || room.settings.capacity, 2, 10),
+        soloTestMode: body.soloTestMode === undefined ? room.settings.soloTestMode === true : body.soloTestMode === true,
+        capacity: clamp(Number(body.capacity) || room.settings.capacity, (body.soloTestMode === true || (body.soloTestMode === undefined && room.settings.soloTestMode === true)) ? 1 : 2, 10),
         rounds: clamp(Number(body.rounds) || room.settings.rounds, 2, 7),
         absurdity: clamp(Number(body.absurdity) || 0, 0, 4),
         advancedModules: normalizeAdvancedModules(body.advancedModules, mode, SETTING_IDS.has(body.setting) ? body.setting : room.settings.setting),
@@ -5567,10 +6280,13 @@ function handleAction(room, player, action, body) {
         voteVisibility: VOTE_VISIBILITIES.has(body.voteVisibility) ? body.voteVisibility : (room.settings.voteVisibility || "secret"),
         tieRule: normalizeTieRule(body.tieRule ?? room.settings.tieRule),
         automationMode: normalizeAutomationMode(body.automationMode ?? room.settings.automationMode),
-        inactivityTimeoutSeconds: clamp(Number(body.inactivityTimeoutSeconds) || room.settings.inactivityTimeoutSeconds || 90, 5, 600),
-        phaseTimeoutSeconds: clamp(Number(body.phaseTimeoutSeconds) || room.settings.phaseTimeoutSeconds || 180, 5, 1800),
+        inactivityTimeoutSeconds: clamp(Number(body.inactivityTimeoutSeconds) || room.settings.inactivityTimeoutSeconds || 90, MIN_AUTOMATION_TIMEOUT_SECONDS, 600),
+        phaseTimeoutSeconds: clamp(Number(body.phaseTimeoutSeconds) || room.settings.phaseTimeoutSeconds || 180, MIN_AUTOMATION_TIMEOUT_SECONDS, 1800),
         hostFailoverEnabled: body.hostFailoverEnabled === undefined ? room.settings.hostFailoverEnabled !== false : body.hostFailoverEnabled !== false,
-        hostFailoverSeconds: clamp(Number(body.hostFailoverSeconds) || room.settings.hostFailoverSeconds || 120, 15, 900),
+        hostFailoverSeconds: clamp(Number(body.hostFailoverSeconds) || room.settings.hostFailoverSeconds || 120, MIN_HOST_FAILOVER_SECONDS, 900),
+        generationSeed: resolveGenerationSeed(body.generationSeed, room.settings.generationSeed),
+        generationSchema: GENERATION_SCHEMA,
+        tutorialEnabled: body.tutorialEnabled === undefined ? room.settings.tutorialEnabled === true : body.tutorialEnabled === true,
         contentPackId: (() => {
           const pack = platform.getPack(body.contentPackId);
           return pack && (pack.public || pack.ownerAccountId === player.accountId) && (pack.setting === "all" || pack.setting === (SETTING_IDS.has(body.setting) ? body.setting : room.settings.setting)) ? pack.id : null;
@@ -5580,16 +6296,18 @@ function handleAction(room, player, action, body) {
           return campaign && campaign.ownerAccountId === player.accountId && !campaign.archived ? campaign.id : null;
         })()
       };
+      applyTutorialPreset(next, room.players.length);
+      applyConfigurationSafety(next);
       next.hiddenRoles = modeConfig(next).hiddenRoles;
-      room.campaignId = next.campaignId;
+      room.campaignId = next.tutorialEnabled ? null : next.campaignId;
       room.hostAccountId = player.accountId || room.hostAccountId || null;
       room.settings = next;
       for (const item of room.players) item.ready = item.id === room.hostPlayerId;
       break;
     }
     case "start":
-      if (player.id !== room.hostPlayerId) throw new Error("Лише хост може почати партію.");
-      if (room.game) throw new Error("Партія вже почалася.");
+      if (player.id !== room.hostPlayerId) throw gameRuleError("Лише хост може почати партію.");
+      if (room.game) throw gameRuleError("Партія вже почалася.");
       const configurationAnalysis = analyzeRoomConfiguration(room.settings, room.players.length);
       const blockingIssues = configurationAnalysis.issues.filter((item) => item.severity === "error");
       if (blockingIssues.length) {
@@ -5597,7 +6315,7 @@ function handleAction(room, player, action, body) {
         validationError.status = 400;
         throw validationError;
       }
-      if (room.players.some((item) => !item.ready && item.id !== room.hostPlayerId)) throw new Error("Не всі гравці готові.");
+      if (room.players.some((item) => !item.ready && item.id !== room.hostPlayerId)) throw gameRuleError("Не всі гравці готові.");
       createGame(room);
       break;
     case "reveal":
@@ -5610,35 +6328,35 @@ function handleAction(room, player, action, body) {
       requestRevealCategory(room, player, body);
       break;
     case "discussion_timer_set": {
-      if (player.id !== room.hostPlayerId) throw new Error("Лише хост керує таймером.");
-      if (!room.game || !isTimedPhase(room.game.phase)) throw new Error("Таймер доступний лише під час фаз спільного обговорення.");
+      if (player.id !== room.hostPlayerId) throw gameRuleError("Лише хост керує таймером.");
+      if (!room.game || !isTimedPhase(room.game.phase)) throw gameRuleError("Таймер доступний лише під час фаз спільного обговорення.");
       const seconds = clamp(Math.round(Number(body.minutes) * 60), 15, 3600);
       room.game.discussionTimer = { durationSeconds: seconds, remainingSeconds: seconds, running: false, endsAt: null };
       break;
     }
     case "discussion_timer_start": {
-      if (player.id !== room.hostPlayerId) throw new Error("Лише хост керує таймером.");
-      if (!room.game || !isTimedPhase(room.game.phase)) throw new Error("Таймер доступний лише під час фаз спільного обговорення.");
+      if (player.id !== room.hostPlayerId) throw gameRuleError("Лише хост керує таймером.");
+      if (!room.game || !isTimedPhase(room.game.phase)) throw gameRuleError("Таймер доступний лише під час фаз спільного обговорення.");
       const current = publicDiscussionTimer(room);
       const remaining = current.remainingSeconds > 0 ? current.remainingSeconds : current.durationSeconds;
       room.game.discussionTimer = { durationSeconds: current.durationSeconds, remainingSeconds: remaining, running: true, endsAt: Date.now() + remaining * 1000 };
       break;
     }
     case "discussion_timer_pause":
-      if (player.id !== room.hostPlayerId) throw new Error("Лише хост керує таймером.");
-      if (!room.game || !isTimedPhase(room.game.phase)) throw new Error("Таймер доступний лише під час фаз спільного обговорення.");
+      if (player.id !== room.hostPlayerId) throw gameRuleError("Лише хост керує таймером.");
+      if (!room.game || !isTimedPhase(room.game.phase)) throw gameRuleError("Таймер доступний лише під час фаз спільного обговорення.");
       pauseDiscussionTimer(room);
       break;
     case "discussion_timer_reset":
-      if (player.id !== room.hostPlayerId) throw new Error("Лише хост керує таймером.");
-      if (!room.game || !isTimedPhase(room.game.phase)) throw new Error("Таймер доступний лише під час фаз спільного обговорення.");
+      if (player.id !== room.hostPlayerId) throw gameRuleError("Лише хост керує таймером.");
+      if (!room.game || !isTimedPhase(room.game.phase)) throw gameRuleError("Таймер доступний лише під час фаз спільного обговорення.");
       resetDiscussionTimer(room);
       break;
     case "automation_settings": {
-      if (player.id !== room.hostPlayerId) throw new Error("Лише хост змінює автоматичне ведення.");
+      if (player.id !== room.hostPlayerId) throw gameRuleError("Лише хост змінює автоматичне ведення.");
       room.settings.automationMode = normalizeAutomationMode(body.automationMode ?? room.settings.automationMode);
-      room.settings.inactivityTimeoutSeconds = clamp(Number(body.inactivityTimeoutSeconds) || room.settings.inactivityTimeoutSeconds || 90, 5, 600);
-      room.settings.phaseTimeoutSeconds = clamp(Number(body.phaseTimeoutSeconds) || room.settings.phaseTimeoutSeconds || 180, 15, 1800);
+      room.settings.inactivityTimeoutSeconds = clamp(Number(body.inactivityTimeoutSeconds) || room.settings.inactivityTimeoutSeconds || 90, MIN_AUTOMATION_TIMEOUT_SECONDS, 600);
+      room.settings.phaseTimeoutSeconds = clamp(Number(body.phaseTimeoutSeconds) || room.settings.phaseTimeoutSeconds || 180, MIN_AUTOMATION_TIMEOUT_SECONDS, 1800);
       if (room.game) {
         ensureAutomationRuntime(room);
         startAutomationPhase(room);
@@ -5647,25 +6365,25 @@ function handleAction(room, player, action, body) {
       break;
     }
     case "resolve_inactive": {
-      if (player.id !== room.hostPlayerId) throw new Error("Лише хост може пропускати дії відсутніх гравців.");
-      if (!room.game) throw new Error("Партія ще не почалася.");
+      if (player.id !== room.hostPlayerId) throw gameRuleError("Лише хост може пропускати дії відсутніх гравців.");
+      if (!room.game) throw gameRuleError("Партія ще не почалася.");
       const changed = neutralizePendingPlayers(room, { allPending: Boolean(body.allPending), targetId: body.targetId || null, reason: body.allPending ? "рішення хоста" : "відсутність у мережі" });
-      if (!changed.length) throw new Error(body.allPending ? "Немає невиконаних обов’язкових дій." : "Немає відсутніх гравців, які блокують поточну фазу.");
+      if (!changed.length) throw gameRuleError(body.allPending ? "Немає невиконаних обов’язкових дій." : "Немає відсутніх гравців, які блокують поточну фазу.");
       room.game.log.push(`Хост застосував нейтральні дії: ${changed.join(", ")}.`);
       break;
     }
     case "transfer_host": {
-      if (player.id !== room.hostPlayerId) throw new Error("Лише хост може передавати права ведучого.");
+      if (player.id !== room.hostPlayerId) throw gameRuleError("Лише хост може передавати права ведучого.");
       const target = room.players.find((item) => item.id === body.targetId);
-      if (!target || target.id === player.id) throw new Error("Оберіть іншого гравця.");
-      if (playerIsOffline(target)) throw new Error("Передати права можна лише підключеному гравцеві.");
+      if (!target || target.id === player.id) throw gameRuleError("Оберіть іншого гравця.");
+      if (playerIsOffline(target)) throw gameRuleError("Передати права можна лише підключеному гравцеві.");
       transferHost(room, target, `Хост ${player.name} передав права`);
       break;
     }
     case "host_failover_settings":
-      if (player.id !== room.hostPlayerId) throw new Error("Лише хост змінює резервне ведення.");
+      if (player.id !== room.hostPlayerId) throw gameRuleError("Лише хост змінює резервне ведення.");
       room.settings.hostFailoverEnabled = body.enabled !== false;
-      room.settings.hostFailoverSeconds = clamp(Number(body.seconds) || room.settings.hostFailoverSeconds || 120, 15, 900);
+      room.settings.hostFailoverSeconds = clamp(Number(body.seconds) || room.settings.hostFailoverSeconds || 120, MIN_HOST_FAILOVER_SECONDS, 900);
       if (room.game) room.game.log.push(`Автоматичну заміну хоста ${room.settings.hostFailoverEnabled ? "увімкнено" : "вимкнено"}; очікування ${room.settings.hostFailoverSeconds} с.`);
       break;
     case "regenerate_recovery_code":
@@ -5673,11 +6391,11 @@ function handleAction(room, player, action, body) {
       player.sessionGeneration = Number(player.sessionGeneration || 1) + 1;
       break;
     case "resolve_recovery_request": {
-      if (player.id !== room.hostPlayerId) throw new Error("Лише хост підтверджує повернення гравця.");
+      if (player.id !== room.hostPlayerId) throw gameRuleError("Лише хост підтверджує повернення гравця.");
       const request = cleanupRecoveryRequests(room).find((item) => item.id === body.requestId && item.status === "pending");
-      if (!request) throw new Error("Активний запит відновлення не знайдено.");
+      if (!request) throw gameRuleError("Активний запит відновлення не знайдено.");
       const target = room.players.find((item) => item.id === request.playerId);
-      if (!target) throw new Error("Гравця для відновлення не знайдено.");
+      if (!target) throw gameRuleError("Гравця для відновлення не знайдено.");
       if (body.approve === false) {
         request.status = "rejected";
         request.resolvedAt = Date.now();
@@ -5692,52 +6410,69 @@ function handleAction(room, player, action, body) {
       }
       break;
     }
+    case "campaign_legacy_vote": {
+      const legacy = room.game?.campaignLegacy;
+      if (!legacy?.enabled || legacy.dilemma?.status !== "open") throw gameRuleError("Активної кампанійної дилеми немає.");
+      if (!campaignLegacyEligibleVoters(room).some((candidate) => candidate.id === player.id)) throw gameRuleError("Зараз ви не маєте права голосу за кампанійну спадщину.");
+      const optionId = String(body.optionId || "");
+      if (!legacy.dilemma.options.some((option) => option.id === optionId)) throw gameRuleError("Невідомий варіант кампанійного рішення.");
+      legacy.dilemma.votes ||= {};
+      legacy.dilemma.votes[player.id] = optionId;
+      break;
+    }
+    case "resolve_campaign_legacy":
+      if (player.id !== room.hostPlayerId) throw gameRuleError("Лише хост завершує кампанійне рішення.");
+      resolveCampaignLegacy(room, { force: Boolean(body.force) });
+      break;
     case "next_phase":
-      if (player.id !== room.hostPlayerId) throw new Error("Лише хост керує фазами.");
+      if (player.id !== room.hostPlayerId) throw gameRuleError("Лише хост керує фазами.");
       advancePhase(room);
       break;
     case "event_vote": {
-      if (!room.game || room.game.phase !== "event" || !room.game.event || room.game.event.resolved) throw new Error("Голосування за подію зараз недоступне.");
-      if (!player.active) throw new Error("Вигнаний гравець не голосує.");
-      if (isDetained(room, player)) throw new Error("В ізоляції голосування недоступне.");
-      if (isSilenced(room, player)) throw new Error("Цього раунду ви позбавлені права голосу.");
+      if (!room.game || room.game.phase !== "event" || !room.game.event || room.game.event.resolved) throw gameRuleError("Рішення щодо події зараз недоступне.");
+      if (!eventDecisionEligible(room, player)) throw gameRuleError(eventDecisionPolicy(room) === "host" ? "Після обговорення рішення кризи підтверджує лише хост." : "Зараз ви не можете брати участь у цьому рішенні.");
       const choiceId = String(body.choiceId || "");
-      if (!room.game.event.choices.some((choice) => choice.id === choiceId)) throw new Error("Невідомий варіант рішення.");
+      if (!room.game.event.choices.some((choice) => choice.id === choiceId)) throw gameRuleError("Невідомий варіант рішення.");
       room.game.eventVotes[player.id] = choiceId;
       break;
     }
     case "resolve_event":
-      if (player.id !== room.hostPlayerId) throw new Error("Лише хост завершує голосування.");
+      if (player.id !== room.hostPlayerId) throw gameRuleError("Лише хост завершує голосування.");
       resolveEvent(room);
       break;
     case "elimination_vote": {
-      if (!room.game?.features?.elimination) throw new Error("У цьому режимі вигнання вимкнено.");
-      if (!room.game || room.game.phase !== "elimination") throw new Error("Голосування за вигнання зараз недоступне.");
-      if (!player.active) throw new Error("Вигнаний гравець не голосує.");
-      if (isDetained(room, player)) throw new Error("В ізоляції голосування недоступне.");
-      if (isSilenced(room, player)) throw new Error("Цього раунду ви позбавлені права голосу.");
+      if (!room.game?.features?.elimination) throw gameRuleError("У цьому режимі вигнання вимкнено.");
+      if (!room.game || room.game.phase !== "elimination") throw gameRuleError("Голосування за вигнання зараз недоступне.");
+      if (!canParticipateInDecision(room, player, "elimination")) throw gameRuleError("Зараз ви не можете брати участь у цьому рішенні.");
       const targetId = String(body.targetId || "");
       if (targetId !== SKIP_VOTE) {
-        const target = room.players.find((candidate) => candidate.id === targetId && candidate.active && candidate.id !== player.id);
-        if (!target) throw new Error("Оберіть іншого активного гравця або пропустіть вигнання.");
+        const allowSoloSelfVote = room.settings.soloTestMode === true && activePlayers(room).length === 1;
+        const target = room.players.find((candidate) => candidate.id === targetId && candidate.active && (allowSoloSelfVote || candidate.id !== player.id));
+        if (!target) throw gameRuleError(allowSoloSelfVote ? "Оберіть активного гравця або пропустіть вигнання." : "Оберіть іншого активного гравця або пропустіть вигнання.");
         if (player.character.cannotVoteAgainstId === targetId && Number(player.character.cannotVoteAgainstUntilRound || 0) >= room.game.round) {
-          throw new Error("Ваша активна клятва або зачарування не дозволяє голосувати проти цього гравця.");
+          throw gameRuleError("Ваша активна клятва або зачарування не дозволяє голосувати проти цього гравця.");
         }
       }
       const sanction = room.settings.voteSystem === "tribunal" && ["exile", "detention", "silence"].includes(body.sanction) ? body.sanction : "exile";
+      if (sanction !== "exile" && targetId !== SKIP_VOTE) {
+        const previous = [...(room.game.sanctionHistory || [])].reverse().find((item) => item.targetId === targetId);
+        if (previous && previous.round === room.game.round - 1 && previous.sanction !== "exile") throw gameRuleError("До тієї самої людини не можна застосовувати м’яку санкцію два раунди поспіль.");
+        const hardDecisionRound = Math.ceil(Number(room.game.maxRounds || room.settings.rounds || 4) * 0.75);
+        if (room.game.round >= hardDecisionRound && activePlayers(room).length > room.settings.capacity) throw gameRuleError("На пізньому етапі переповненої партії доступне лише вигнання або відмова від санкції.");
+      }
       const runoff = room.game.runoff && room.game.runoff.round === room.game.round && room.game.runoff.status === "voting" ? room.game.runoff : null;
       if (runoff) {
         const key = judgementOptionKey(targetId, sanction);
-        if (!runoff.options.some((item) => item.key === key)) throw new Error("У повторному голосуванні доступні лише варіанти, що набрали однакову найбільшу кількість голосів.");
+        if (!runoff.options.some((item) => item.key === key)) throw gameRuleError("У повторному голосуванні доступні лише варіанти, що набрали однакову найбільшу кількість голосів.");
       }
       room.game.eliminationVotes[player.id] = { targetId, sanction };
       break;
     }
     case "return_vote": {
-      if (!room.game || room.game.phase !== "elimination") throw new Error("Голосування за повернення зараз недоступне.");
-      if (!player.active || isDetained(room, player) || isSilenced(room, player)) throw new Error("Ви не можете голосувати цього раунду.");
+      if (!room.game || room.game.phase !== "elimination") throw gameRuleError("Голосування за повернення зараз недоступне.");
+      if (!canParticipateInDecision(room, player, "appeal")) throw gameRuleError("Ви не можете голосувати цього раунду.");
       const targetId = String(body.targetId || SKIP_VOTE);
-      if (targetId !== SKIP_VOTE && !pendingAppeals(room).some((item) => item.id === targetId)) throw new Error("Ця апеляція вже неактивна.");
+      if (targetId !== SKIP_VOTE && !pendingAppeals(room).some((item) => item.id === targetId)) throw gameRuleError("Ця апеляція вже неактивна.");
       room.game.returnVotes[player.id] = targetId;
       break;
     }
@@ -5748,27 +6483,27 @@ function handleAction(room, player, action, body) {
     case "outside_deal_vote":
       voteOutsideProposal(room, player, body); break;
     case "give_item":
-      if (!room.game?.features?.itemTrade) throw new Error("У цьому режимі обмін предметами вимкнено.");
+      if (!room.game?.features?.itemTrade) throw gameRuleError("У цьому режимі обмін предметами вимкнено.");
       giveItem(room, player, body); break;
     case "provide_care":
-      if (!room.game?.features?.treatment) throw new Error("У цьому режимі лікування вимкнено.");
+      if (!room.game?.features?.treatment) throw gameRuleError("У цьому режимі лікування вимкнено.");
       provideCare(room, player, body, false); break;
     case "role_action":
-      if (!room.game?.features?.hiddenRoles) throw new Error("У цьому режимі приховані ролі вимкнено.");
+      if (!room.game?.features?.hiddenRoles) throw gameRuleError("У цьому режимі приховані ролі вимкнено.");
       useRoleAction(room, player, body); break;
     case "set_operation_support":
       setOperationSupport(room, player, body); break;
     case "launch_expedition":
-      if (!room.game?.features?.operations) throw new Error("У цьому режимі експедиції вимкнено.");
+      if (!room.game?.features?.operations) throw gameRuleError("У цьому режимі експедиції вимкнено.");
       launchExpedition(room, player, body); break;
     case "repair_module":
-      if (!room.game?.features?.operations) throw new Error("У цьому режимі плановий ремонт вимкнено.");
+      if (!room.game?.features?.operations) throw gameRuleError("У цьому режимі плановий ремонт вимкнено.");
       repairModule(room, player, body); break;
     case "use_ability": useAbility(room, player, body); break;
     case "investigate_case": investigateDetectiveCase(room, player, body); break;
     case "case_accusation": castDetectiveAccusation(room, player, body); break;
     case "leave":
-      if (room.game) throw new Error("Після початку партії покинути кімнату через меню не можна.");
+      if (room.game) throw gameRuleError("Після початку партії покинути кімнату через меню не можна.");
       room.players = room.players.filter((item) => item.id !== player.id);
       if (room.hostPlayerId === player.id && room.players.length) {
         const nextHost = room.players[0];
@@ -5784,33 +6519,65 @@ function handleAction(room, player, action, body) {
       }
       break;
     default:
-      throw new Error("Невідома дія.");
+      throw gameRuleError("Невідома дія.");
   }
   touch(room);
 }
 
 function jsonResponse(res, status, payload, extraHeaders = {}) {
   const body = JSON.stringify(payload);
-  res.writeHead(status, {
+  res.writeHead(status, securityHeaders({
     "Content-Type": "application/json; charset=utf-8",
     "Content-Length": Buffer.byteLength(body),
     "Cache-Control": "no-store",
     ...extraHeaders
-  });
+  }));
   res.end(body);
 }
-function readJson(req) {
+function requestBodyLimit(req) {
+  const pathname = new URL(req.url || "/", "http://localhost").pathname;
+  if (/^\/api\/accounts\/(login|register|reset-password)$/u.test(pathname)) return 8 * 1024;
+  if (/^\/api\/rooms\/[A-Z0-9]{6}\/action$/u.test(pathname) || /^\/api\/rooms\/(create|join|rejoin|recovery-request)$/u.test(pathname)) return 64 * 1024;
+  if (/^\/api\/packs\/(import|analyze)$/u.test(pathname)) return 5 * 1024 * 1024;
+  if (/^\/api\/packs/u.test(pathname)) return 2 * 1024 * 1024;
+  return 256 * 1024;
+}
+function readJson(req, explicitLimit = null) {
   return new Promise((resolve, reject) => {
-    let data = "";
+    const limit = Number(explicitLimit || requestBodyLimit(req));
+    let size = 0;
+    const chunks = [];
+    let settled = false;
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
     req.on("data", (chunk) => {
-      data += chunk;
-      if (data.length > 5 * 1024 * 1024) reject(new Error("Запит завеликий."));
+      if (settled) return;
+      size += chunk.length;
+      if (size > limit) {
+        const error = new Error(`Запит завеликий. Максимум — ${Math.ceil(limit / 1024)} КБ.`);
+        error.status = 413;
+        req.pause();
+        fail(error);
+        return;
+      }
+      chunks.push(chunk);
     });
     req.on("end", () => {
-      try { resolve(data ? JSON.parse(data) : {}); }
-      catch { reject(new Error("Некоректний JSON.")); }
+      if (settled) return;
+      settled = true;
+      try {
+        const data = Buffer.concat(chunks).toString("utf8");
+        resolve(data ? JSON.parse(data) : {});
+      } catch {
+        const error = new Error("Некоректний JSON.");
+        error.status = 400;
+        reject(error);
+      }
     });
-    req.on("error", reject);
+    req.on("error", fail);
   });
 }
 function mimeType(filePath) {
@@ -5820,6 +6587,7 @@ function mimeType(filePath) {
     ".js": "text/javascript; charset=utf-8",
     ".css": "text/css; charset=utf-8",
     ".json": "application/json; charset=utf-8",
+    ".md": "text/markdown; charset=utf-8",
     ".png": "image/png",
     ".svg": "image/svg+xml",
     ".ico": "image/x-icon"
@@ -5830,21 +6598,21 @@ function serveStatic(req, res, pathname) {
   const safe = path.normalize(requested).replace(/^(\.\.[/\\])+/, "");
   const filePath = path.join(PUBLIC_DIR, safe);
   if (!filePath.startsWith(PUBLIC_DIR)) {
-    res.writeHead(403); res.end("Forbidden"); return;
+    res.writeHead(403, securityHeaders({ "Content-Type": "text/plain; charset=utf-8" })); res.end("Forbidden"); return;
   }
   fs.stat(filePath, (error, stat) => {
     if (error || !stat.isFile()) {
-      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.writeHead(404, securityHeaders({ "Content-Type": "text/plain; charset=utf-8" }));
       res.end("Файл не знайдено.");
       return;
     }
     const etag = `W/\"${stat.size.toString(16)}-${Math.floor(stat.mtimeMs).toString(16)}\"`;
     if (req.headers["if-none-match"] === etag) {
-      res.writeHead(304, { ETag: etag, "Cache-Control": "no-cache" });
+      res.writeHead(304, securityHeaders({ ETag: etag, "Cache-Control": "no-cache" }));
       res.end();
       return;
     }
-    res.writeHead(200, { "Content-Type": mimeType(filePath), "Content-Length": stat.size, ETag: etag, "Cache-Control": "no-cache", "Vary": "Accept-Encoding" });
+    res.writeHead(200, securityHeaders({ "Content-Type": mimeType(filePath), "Content-Length": stat.size, ETag: etag, "Cache-Control": "no-cache", "Vary": "Accept-Encoding" }));
     fs.createReadStream(filePath).pipe(res);
   });
 }
@@ -5940,8 +6708,16 @@ function waitForRoomRevision(room, revision, waitMs, player, req, res) {
     if (room.revision !== revision) waiter.finish("changed");
   });
 }
-function accountFromQuery(url) {
-  return platform.authenticate(url.searchParams.get("accountId"), url.searchParams.get("token"));
+function accountCredentials(req, url = null, body = null) {
+  const authHeader = String(req?.headers?.authorization || "");
+  const bearer = authHeader.match(/^Bearer\s+(.+)$/i)?.[1] || "";
+  const accountId = String(req?.headers?.["x-account-id"] || body?.accountId || "");
+  const tokenValue = String(bearer || body?.accountToken || body?.token || "");
+  return { accountId, token: tokenValue };
+}
+function accountFromRequest(req, url = null, body = null) {
+  const credentials = accountCredentials(req, url, body);
+  return platform.authenticate(credentials.accountId, credentials.token);
 }
 function requireAccount(account) { if (!account) throw new Error("Потрібен вхід до локального облікового запису."); return account; }
 
@@ -5963,7 +6739,7 @@ const server = http.createServer(async (req, res) => {
     networkMetrics.requests += 1;
     const limitResult = pathname.startsWith("/api/") ? rateLimit(req, url, pathname) : null;
     if (limitResult && !limitResult.allowed) return jsonResponse(res, 429, { ok: false, error: `Забагато запитів. Повторіть через ${limitResult.retryAfter} с.`, retryAfterSeconds: limitResult.retryAfter }, rateHeaders(limitResult));
-    if (pathname === "/api/health" && req.method === "GET") return jsonResponse(res, 200, { ok: true, rooms: rooms.size, version: VERSION, uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000), persistent: true, network: { activeLongPolls: [...roomStateWaiters.values()].reduce((sum, set) => sum + set.size, 0), rateBuckets: requestBuckets.size, ...networkMetrics } }, limitResult ? rateHeaders(limitResult) : {});
+    if (pathname === "/api/health" && req.method === "GET") return jsonResponse(res, 200, { ok: true, rooms: rooms.size, version: VERSION, schemas: { rooms: ROOM_SCHEMA, generation: GENERATION_SCHEMA, content: CONTENT_SCHEMA, platform: PLATFORM_SCHEMA }, uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000), persistent: true, persistence: { enabled: true, strategy: "atomic-per-room-json", dataDirectory: path.basename(DATA_DIR), roomTtlDays: Math.round(ROOM_TTL_MS / 86400000) }, network: { activeLongPolls: [...roomStateWaiters.values()].reduce((sum, set) => sum + set.size, 0), rateBuckets: requestBuckets.size, ...networkMetrics } }, limitResult ? rateHeaders(limitResult) : {});
 
     if (pathname === "/api/accounts/register" && req.method === "POST") {
       const result = platform.register(await readJson(req));
@@ -5973,8 +6749,23 @@ const server = http.createServer(async (req, res) => {
       const result = platform.login(await readJson(req));
       return jsonResponse(res, 200, { ok: true, ...result });
     }
+    if (pathname === "/api/accounts/reset-password" && req.method === "POST") {
+      const result = platform.resetPassword(await readJson(req));
+      return jsonResponse(res, 200, { ok: true, ...result });
+    }
+    if (pathname === "/api/accounts/sessions" && req.method === "GET") {
+      const credentials = accountCredentials(req, url);
+      const account = requireAccount(platform.authenticate(credentials.accountId, credentials.token));
+      return jsonResponse(res, 200, { ok: true, sessions: platform.listSessions(account, credentials.token) });
+    }
+    if (pathname === "/api/accounts/sessions/revoke" && req.method === "POST") {
+      const body = await readJson(req);
+      const credentials = accountCredentials(req, url, body);
+      const account = requireAccount(platform.authenticate(credentials.accountId, credentials.token));
+      return jsonResponse(res, 200, { ok: true, ...platform.revokeSession(account, body.sessionId, credentials.token) });
+    }
     if (pathname === "/api/platform/bootstrap" && req.method === "GET") {
-      const account = accountFromQuery(url);
+      const account = accountFromRequest(req, url);
       return jsonResponse(res, 200, {
         ok: true,
         account: platform.publicAccount(account),
@@ -5989,35 +6780,40 @@ const server = http.createServer(async (req, res) => {
       });
     }
     if (pathname === "/api/campaigns/create" && req.method === "POST") {
-      const body = await readJson(req); const account = requireAccount(platform.authenticate(body.accountId, body.accountToken));
+      const body = await readJson(req); const account = requireAccount(accountFromRequest(req, url, body));
       return jsonResponse(res, 201, { ok: true, campaign: platform.createCampaign(account, body) });
     }
     if (pathname === "/api/content-packs/create" && req.method === "POST") {
-      const body = await readJson(req); const account = requireAccount(platform.authenticate(body.accountId, body.accountToken));
+      const body = await readJson(req); const account = requireAccount(accountFromRequest(req, url, body));
       return jsonResponse(res, 201, { ok: true, pack: platform.createPack(account, body.pack || body) });
     }
     if (pathname === "/api/content-packs/import" && req.method === "POST") {
-      const body = await readJson(req); const account = requireAccount(platform.authenticate(body.accountId, body.accountToken));
+      const body = await readJson(req); const account = requireAccount(accountFromRequest(req, url, body));
       return jsonResponse(res, 201, { ok: true, pack: platform.importPack(account, body.pack) });
+    }
+    if (pathname === "/api/content-packs/analyze" && req.method === "POST") {
+      const body = await readJson(req); requireAccount(accountFromRequest(req, url, body));
+      const sampleSize = clamp(Number(body.sampleSize) || 25, 10, 100);
+      return jsonResponse(res, 200, { ok: true, report: platform.analyzePack(body.pack || {}, { sampleSize }) });
     }
     const packMatch = pathname.match(/^\/api\/content-packs\/([A-Za-z0-9_]+)$/);
     if (packMatch && req.method === "PUT") {
-      const body = await readJson(req); const account = requireAccount(platform.authenticate(body.accountId, body.accountToken));
+      const body = await readJson(req); const account = requireAccount(accountFromRequest(req, url, body));
       return jsonResponse(res, 200, { ok: true, pack: platform.updatePack(account, packMatch[1], body.pack || body) });
     }
     if (packMatch && req.method === "DELETE") {
-      const body = await readJson(req); const account = requireAccount(platform.authenticate(body.accountId, body.accountToken));
+      const body = await readJson(req); const account = requireAccount(accountFromRequest(req, url, body));
       platform.deletePack(account, packMatch[1]); return jsonResponse(res, 200, { ok: true });
     }
     if (packMatch && req.method === "GET") {
-      const account = accountFromQuery(url); const pack = platform.getPack(packMatch[1]);
+      const account = accountFromRequest(req, url); const pack = platform.getPack(packMatch[1]);
       if (!pack || (!pack.public && pack.ownerAccountId !== account?.id)) return jsonResponse(res, 404, { ok: false, error: "Набір не знайдено." });
       return jsonResponse(res, 200, { ok: true, pack });
     }
 
     if (pathname === "/api/rooms/create" && req.method === "POST") {
       const body = await readJson(req);
-      const account = platform.authenticate(body.accountId, body.accountToken);
+      const account = accountFromRequest(req, url, body);
       const name = String(body.name || account?.displayName || "").trim().slice(0, 32);
       if (!name) return jsonResponse(res, 400, { ok: false, error: "Введіть ім’я." });
       const code = roomCode();
@@ -6029,7 +6825,8 @@ const server = http.createServer(async (req, res) => {
         mode,
         setting: SETTING_IDS.has(body.setting) ? body.setting : "modern",
         scenarioMode: SCENARIO_MODES.has(body.scenarioMode) ? body.scenarioMode : "procedural",
-        capacity: clamp(Number(body.capacity) || 3, 2, 10),
+        soloTestMode: body.soloTestMode === true,
+        capacity: clamp(Number(body.capacity) || (body.soloTestMode === true ? 1 : 3), body.soloTestMode === true ? 1 : 2, 10),
         rounds: clamp(Number(body.rounds) || 4, 2, 7),
         absurdity: clamp(Number(body.absurdity) || 2, 0, 4),
         advancedModules: normalizeAdvancedModules(body.advancedModules, mode, SETTING_IDS.has(body.setting) ? body.setting : "modern"),
@@ -6045,15 +6842,20 @@ const server = http.createServer(async (req, res) => {
         voteVisibility: VOTE_VISIBILITIES.has(body.voteVisibility) ? body.voteVisibility : "secret",
         tieRule: normalizeTieRule(body.tieRule),
         automationMode: normalizeAutomationMode(body.automationMode),
-        inactivityTimeoutSeconds: clamp(Number(body.inactivityTimeoutSeconds) || 90, 5, 600),
-        phaseTimeoutSeconds: clamp(Number(body.phaseTimeoutSeconds) || 180, 5, 1800),
+        inactivityTimeoutSeconds: clamp(Number(body.inactivityTimeoutSeconds) || 90, MIN_AUTOMATION_TIMEOUT_SECONDS, 600),
+        phaseTimeoutSeconds: clamp(Number(body.phaseTimeoutSeconds) || 180, MIN_AUTOMATION_TIMEOUT_SECONDS, 1800),
         hostFailoverEnabled: body.hostFailoverEnabled !== false,
-        hostFailoverSeconds: clamp(Number(body.hostFailoverSeconds) || 120, 15, 900),
+        hostFailoverSeconds: clamp(Number(body.hostFailoverSeconds) || 120, MIN_HOST_FAILOVER_SECONDS, 900),
+        generationSeed: resolveGenerationSeed(body.generationSeed),
+        generationSchema: GENERATION_SCHEMA,
+        tutorialEnabled: body.tutorialEnabled === true,
         contentPackId: pack?.id || null,
         campaignId: campaign?.id || null
       };
+      applyTutorialPreset(settings, 1);
+      applyConfigurationSafety(settings);
       settings.hiddenRoles = modeConfig(settings).hiddenRoles;
-      const room = { code, createdAt: Date.now(), updatedAt: Date.now(), revision: 1, hostPlayerId: player.id, hostAccountId: account?.id || null, hostLastChangedAt: Date.now(), hostHistory: [], recoveryRequests: [], campaignId: campaign?.id || null, settings, players: [player], game: null };
+      const room = { code, createdAt: Date.now(), updatedAt: Date.now(), revision: 1, hostPlayerId: player.id, hostAccountId: account?.id || null, hostLastChangedAt: Date.now(), hostHistory: [], recoveryRequests: [], campaignId: settings.tutorialEnabled ? null : (campaign?.id || null), settings, players: [player], game: null };
       rooms.set(code, room);
       saveRoomsSoon();
       return jsonResponse(res, 201, { ok: true, code, playerId: player.id, token: player.token, recoveryCode: player.recoveryCode });
@@ -6061,8 +6863,9 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === "/api/rooms/join" && req.method === "POST") {
       const body = await readJson(req);
-      const code = String(body.code || "").trim().toUpperCase();
-      const account = platform.authenticate(body.accountId, body.accountToken);
+      const code = String(body.code || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (code.length !== 6) return jsonResponse(res, 400, { ok: false, error: "Код кімнати має містити рівно 6 символів." });
+      const account = accountFromRequest(req, url, body);
       const name = String(body.name || account?.displayName || "").trim().slice(0, 32);
       const room = rooms.get(code);
       if (!room) return jsonResponse(res, 404, { ok: false, error: "Кімнату не знайдено." });
@@ -6078,13 +6881,15 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === "/api/rooms/rejoin" && req.method === "POST") {
       const body = await readJson(req);
-      const code = String(body.code || "").trim().toUpperCase();
+      const code = String(body.code || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (code.length !== 6) return jsonResponse(res, 400, { ok: false, error: "Код кімнати має містити рівно 6 символів." });
+      const supplied = normalizeRecoveryCode(body.recoveryCode);
+      if (supplied.length !== 10) return jsonResponse(res, 400, { ok: false, error: "Персональний код має містити рівно 10 символів." });
       const room = rooms.get(code);
       if (!room) return jsonResponse(res, 404, { ok: false, error: "Кімнату не знайдено." });
       ensureRoomSessionState(room);
-      const supplied = normalizeRecoveryCode(body.recoveryCode);
       const player = room.players.find((item) => normalizeRecoveryCode(item.recoveryCode) === supplied);
-      if (!player || supplied.length !== 10) return jsonResponse(res, 401, { ok: false, error: "Персональний код відновлення недійсний." });
+      if (!player) return jsonResponse(res, 401, { ok: false, error: "Персональний код відновлення недійсний." });
       player.token = token();
       player.sessionGeneration = Number(player.sessionGeneration || 1) + 1;
       player.connected = true;
@@ -6096,7 +6901,8 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === "/api/rooms/recovery-request" && req.method === "POST") {
       const body = await readJson(req);
-      const code = String(body.code || "").trim().toUpperCase();
+      const code = String(body.code || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (code.length !== 6) return jsonResponse(res, 400, { ok: false, error: "Код кімнати має містити рівно 6 символів." });
       const room = rooms.get(code);
       if (!room) return jsonResponse(res, 404, { ok: false, error: "Кімнату не знайдено." });
       ensureRoomSessionState(room);
@@ -6132,7 +6938,11 @@ const server = http.createServer(async (req, res) => {
       networkMetrics.stateRequests += 1;
       const room = rooms.get(stateMatch[1]);
       if (!room) return jsonResponse(res, 404, { ok: false, error: "Кімнату не знайдено." });
-      const player = auth(room, url.searchParams.get("playerId"), url.searchParams.get("token"));
+      const player = auth(
+        room,
+        req.headers["x-player-id"] || url.searchParams.get("playerId"),
+        req.headers["x-player-token"] || url.searchParams.get("token")
+      );
       if (!player) return jsonResponse(res, 401, { ok: false, error: "Сеанс гравця недійсний." });
       player.lastSeen = Date.now();
       player.connected = true;
@@ -6155,7 +6965,16 @@ const server = http.createServer(async (req, res) => {
       const player = auth(room, body.playerId, body.token);
       if (!player) return jsonResponse(res, 401, { ok: false, error: "Сеанс гравця недійсний." });
       player.lastSeen = Date.now();
-      handleAction(room, player, String(body.action || ""), body);
+      try {
+        handleAction(room, player, String(body.action || ""), body);
+      } catch (error) {
+        if (!error.status && error?.constructor === Error) {
+          error.status = gameRuleStatus(error.message);
+          error.expose = true;
+          error.name = "GameRuleError";
+        }
+        throw error;
+      }
       clearAutomationControlOnReturn(player);
       return jsonResponse(res, 200, { ...buildState(room, player), network: { transport: "action-response", recommendedWaitMs: 20_000, serverTime: Date.now() } }, limitResult ? rateHeaders(limitResult) : {});
     }
@@ -6170,6 +6989,7 @@ const server = http.createServer(async (req, res) => {
     else if (status === 500 && /уже існує|вже використовується|немає доступу|вже почалася/i.test(message)) status = 409;
     else if (status === 500 && /Введіть|Вкажіть|має містити|Некоректн|додайте|потрібна назва|щонайменше/i.test(message)) status = 400;
     if (status >= 500) console.error(error);
+    else if (!error.expose && process.env.NODE_ENV !== "test") console.warn(`[${status}] ${message}`);
     return jsonResponse(res, status, { ok: false, error: message });
   }
 });
@@ -6189,29 +7009,35 @@ const automationInterval = setInterval(() => {
       }
     }
   }
-}, 1000);
+}, AUTOMATION_TICK_MS);
 automationInterval.unref();
 
-function gracefulShutdown(signal) {
+let shutdownStarted = false;
+async function gracefulShutdown(signal, exitCode = 0) {
+  if (shutdownStarted) return;
+  shutdownStarted = true;
+  clearInterval(automationInterval);
+  const forceExit = setTimeout(() => process.exit(exitCode), 4_000);
+  forceExit.unref();
   try {
-    saveRoomsNow();
+    await saveRoomsNow();
+    await backupRooms(`shutdown-${String(signal).toLowerCase()}`);
     platform.saveAllNow();
-    backupRooms(`shutdown-${String(signal).toLowerCase()}`);
     platform.backup(`shutdown-${String(signal).toLowerCase()}`);
   } catch (error) { console.error("Помилка фінального збереження:", error.message); }
-  server.close(() => process.exit(0));
-  setTimeout(() => process.exit(0), 1500).unref();
+  server.close(() => process.exit(exitCode));
+  server.closeIdleConnections?.();
+  server.closeAllConnections?.();
 }
-process.on("SIGINT", () => gracefulShutdown("SIGINT"));
-process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => { void gracefulShutdown("SIGINT"); });
+process.on("SIGTERM", () => { void gracefulShutdown("SIGTERM"); });
 process.on("uncaughtException", (error) => {
   console.error("Критична помилка:", error);
-  try { saveRoomsNow(); backupRooms("crash"); platform.saveAllNow(); platform.backup("crash"); } catch {}
-  process.exit(1);
+  void gracefulShutdown("crash", 1);
 });
 
-backupRooms("startup");
 loadRooms();
+void backupRooms("startup");
 server.listen(PORT, HOST, () => {
   console.log(`\nСХОВИЩЕ ${VERSION} — сервер запущено\n`);
   console.log(`На цьому комп’ютері: http://localhost:${PORT}`);

@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { stopChildProcess } = require("./test_support");
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "bunker-character-sets-"));
 const port = 33900 + Math.floor(Math.random() * 200);
 const base = `http://127.0.0.1:${port}`;
@@ -29,23 +30,19 @@ async function makeGame(characterSetMode, customCharacterKeys = [], setting = "m
   const compact = await makeGame("compact");
   assert.deepEqual(Object.keys(compact.self.privateCharacter.values), ["profession", "health", "skill", "trait", "item", "phobia", "secret", "relationship"]);
   const extended = await makeGame("extended");
-  assert.equal(Object.keys(extended.self.privateCharacter.values).length, 13);
+  assert.equal(Object.keys(extended.self.privateCharacter.values).length, 14);
   const customKeys = ["origin", "profession", "health", "item", "secret"];
   const custom = await makeGame("custom", customKeys);
   assert.deepEqual(Object.keys(custom.self.privateCharacter.values), customKeys);
   const detective = await makeGame("compact", [], "detective");
   assert.deepEqual(Object.keys(detective.self.privateCharacter.values), ["profession", "health", "skill", "trait", "item", "alibi", "testimony", "secret"]);
-  await new Promise((resolve) => {
-    child.once("exit", resolve);
-    child.kill("SIGTERM");
-    setTimeout(resolve, 1500);
-  });
+  await stopChildProcess(child);
   fs.rmSync(dataDir, { recursive: true, force: true });
   console.log("Набори характеристик перевірено: стислий, розширений, власний і детективний.");
 })().catch(async (e) => {
   console.error(e);
   if (child && !child.killed) {
-    await new Promise((resolve) => { child.once("exit", resolve); child.kill("SIGTERM"); setTimeout(resolve, 1500); });
+    await stopChildProcess(child);
   }
   fs.rmSync(dataDir, { recursive: true, force: true });
   process.exit(1);

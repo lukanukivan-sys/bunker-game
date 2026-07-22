@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { stopChildProcess } = require("./test_support");
 
 const root = __dirname;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "bunker-host-dashboard-"));
@@ -30,8 +31,7 @@ async function getState(code, session) {
   return api(`/api/rooms/${code}/state?playerId=${session.playerId}&token=${session.token}`);
 }
 async function stop() {
-  if (!child || child.killed) return;
-  await new Promise((resolve) => { child.once("exit", resolve); child.kill("SIGTERM"); setTimeout(resolve, 1500); });
+  await stopChildProcess(child);
 }
 
 (async () => {
@@ -86,10 +86,10 @@ async function stop() {
   await action(host.code, host, "next_phase");
   hostState = await getState(host.code, host);
   assert.equal(hostState.game.phase, "event");
-  assert.equal(hostState.game.hostDashboard.pending, 4);
+  assert.equal(hostState.game.hostDashboard.pending, 1);
   assert.equal(hostState.game.hostDashboard.canAdvance, false);
   const choiceId = hostState.game.event.choices[0].id;
-  for (const session of sessions) await action(host.code, session, "event_vote", { choiceId });
+  await action(host.code, host, "event_vote", { choiceId });
   hostState = await getState(host.code, host);
   assert.equal(hostState.game.hostDashboard.pending, 0);
   assert.equal(hostState.game.hostDashboard.canAdvance, false, "До підрахунку події перехід має залишатися небезпечним");
@@ -99,7 +99,7 @@ async function stop() {
 
   await stop();
   fs.rmSync(dataDir, { recursive: true, force: true });
-  console.log("1.0.8: панель хоста, приватність, готовність фаз і попередження переходу перевірені.");
+  console.log("1.2.10: панель хоста, приватність, готовність фаз і попередження переходу перевірені.");
 })().catch(async (error) => {
   console.error(error);
   await stop();

@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { stopChildProcess } = require("./test_support");
 
 const baseDir = __dirname;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "shelter-api-"));
@@ -15,26 +16,25 @@ function launch() {
   server.stderr.on("data", (chunk) => process.stderr.write(chunk));
 }
 async function api(route, options = {}) {
-  const response = await fetch(base + route, { method: options.method || "GET", headers: options.body ? { "Content-Type": "application/json" } : undefined, body: options.body ? JSON.stringify(options.body) : undefined });
+  const headers = { ...(options.headers || {}), ...(options.body ? { "Content-Type": "application/json" } : {}) };
+  const response = await fetch(base + route, { method: options.method || "GET", headers: Object.keys(headers).length ? headers : undefined, body: options.body ? JSON.stringify(options.body) : undefined });
   const payload = await response.json();
   if (!response.ok || !payload.ok) throw new Error(payload.error || `HTTP ${response.status}`);
   return payload;
 }
 async function waitReady() {
   for (let i = 0; i < 50; i += 1) {
-    try { const health = await api("/api/health"); if (health.version === "1.0.5") return; } catch {}
+    try { const health = await api("/api/health"); if (health.version === "1.2.10") return; } catch {}
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error("Сервер не запустився.");
 }
 async function stop() {
-  if (!server || server.killed) return;
-  server.kill("SIGTERM");
-  await new Promise((resolve) => { server.once("exit", resolve); setTimeout(resolve, 1800); });
+  await stopChildProcess(server);
 }
 (async () => {
   launch(); await waitReady();
-  const reg = await api("/api/accounts/register", { method: "POST", body: { username: "api_tester", displayName: "API Тестер", password: "secret12" } });
+  const reg = await api("/api/accounts/register", { method: "POST", body: { username: "api_tester", displayName: "API Тестер", password: "Secure-Test-129!" } });
   const credentials = { accountId: reg.accountId, accountToken: reg.token };
   const campaign = (await api("/api/campaigns/create", { method: "POST", body: { ...credentials, name: "API кампанія", setting: "modern" } })).campaign;
   const pack = (await api("/api/content-packs/create", { method: "POST", body: { ...credentials, pack: { name: "API набір", setting: "modern", entries: { professions: [{ name: "Оператор тестового стенда" }] } } } })).pack;
@@ -68,13 +68,13 @@ async function stop() {
   const finalState = await state();
   assert.equal(finalState.game.phase, "final");
   assert(Number.isFinite(finalState.game.final.score));
-  let bootstrap = await api(`/api/platform/bootstrap?accountId=${reg.accountId}&token=${reg.token}`);
+  let bootstrap = await api("/api/platform/bootstrap", { headers: { Authorization: `Bearer ${reg.token}`, "X-Account-Id": reg.accountId } });
   assert.equal(bootstrap.account.stats.games, 1);
   assert.equal(bootstrap.campaigns[0].chapters.length, 1);
   await stop();
   launch(); await waitReady();
-  const login = await api("/api/accounts/login", { method: "POST", body: { username: "api_tester", password: "secret12" } });
-  bootstrap = await api(`/api/platform/bootstrap?accountId=${login.accountId}&token=${login.token}`);
+  const login = await api("/api/accounts/login", { method: "POST", body: { username: "api_tester", password: "Secure-Test-129!" } });
+  bootstrap = await api("/api/platform/bootstrap", { headers: { Authorization: `Bearer ${login.token}`, "X-Account-Id": login.accountId } });
   assert.equal(bootstrap.account.stats.games, 1);
   assert.equal(bootstrap.campaigns[0].chapters.length, 1);
   assert.equal(bootstrap.packs.length, 1);
@@ -82,7 +82,7 @@ async function stop() {
   assert.equal(health.rooms, 1);
   await stop();
   fs.rmSync(dataDir, { recursive: true, force: true });
-  console.log("Повний локальний HTTP-цикл 1.0.5 перевірено: профіль, кампанія, набір, партія, фінал і відновлення після перезапуску.");
+  console.log("Повний локальний HTTP-цикл 1.2.10 перевірено: профіль, кампанія, набір, партія, фінал і відновлення після перезапуску.");
 })().catch(async (error) => {
   console.error(error);
   await stop();

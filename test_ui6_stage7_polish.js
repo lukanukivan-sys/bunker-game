@@ -1,0 +1,10 @@
+const fs = require('fs');
+const assert = require('assert');
+const app = fs.readFileSync('public/app.js','utf8');
+const css = fs.readFileSync('public/styles.css','utf8');
+assert(app.includes('hasReasonReport'), 'crisis outcome deduplication missing');
+assert(app.includes('logMeta ='), 'semantic journal metadata missing');
+assert(app.includes('compact-empty-phase'), 'compact completed phase state missing');
+assert(css.includes('UI6 Stage 7'), 'stage 7 CSS missing');
+assert(css.includes('prefers-reduced-motion'), 'reduced motion support missing');
+console.log('✅ UI6 stage 7 final polish checks passed');

@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { stopChildProcess } = require("./test_support");
 
 const root = __dirname;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "bunker-mode-loops-"));
@@ -40,8 +41,7 @@ async function action(room, who, actionName, extra = {}, expectError = false) {
   return api(`/api/rooms/${room.code}/action`, "POST", { playerId: who.playerId, token: who.token, action: actionName, ...extra }, expectError);
 }
 async function stop() {
-  if (!child || child.killed) return;
-  await new Promise((resolve) => { child.once("exit", resolve); child.kill("SIGTERM"); setTimeout(resolve, 1200); });
+  await stopChildProcess(child);
 }
 
 (async () => {
@@ -86,7 +86,7 @@ async function stop() {
 
     const advanced = await create("advanced");
     let a = await state(advanced);
-    assert.deepEqual(a.game.phaseLoop.map((item) => item.code), ["reveal", "discussion", "operations", "intrigue", "event", "elimination", "round_end"]);
+    assert.deepEqual(a.game.phaseLoop.map((item) => item.code), ["reveal", "discussion", "operations", "event", "elimination", "round_end"]);
     await action(advanced, advanced, "next_phase");
     a = await state(advanced);
     assert.equal(a.game.phase, "discussion");
@@ -117,7 +117,7 @@ async function stop() {
     assert(html.includes('id="phaseLoopTrack"'));
     assert(app.includes("MODE_PHASE_LOOPS") || app.includes("mode-loop-preview"));
     assert(css.includes(".phase-loop-track"));
-    console.log("1.1.0: окремі цикли режимів, доступність дій і детективне розслідування перевірені.");
+    console.log("1.2.10: окремі цикли режимів, доступність дій і детективне розслідування перевірені.");
   } finally {
     await stop();
     fs.rmSync(dataDir, { recursive: true, force: true });

@@ -4,7 +4,7 @@ cd /d "%~dp0"
 where node.exe >nul 2>&1
 if errorlevel 1 goto NODE_MISSING
 
-echo СХОВИЩЕ 1.0.5 — запуск сервера
+echo СХОВИЩЕ 1.2.10 — запуск сервера
 echo.
 node.exe "%~dp0server.js"
 set "EXIT_CODE=%ERRORLEVEL%"

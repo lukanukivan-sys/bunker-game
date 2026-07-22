@@ -2,6 +2,26 @@
 
 // Механічні відмінності нових сетингів.
 module.exports = {
+  "fantasy": {
+    "name": "Магічне забруднення",
+    "description": "Дика магія поступово виснажує стабільність укриття. Магічні, алхімічні й ритуальні компетенції значно посилюють тематичні операції.",
+    "startEffects": { "morale": -2, "medicine": 2 },
+    "roundEffects": { "integrity": -1 },
+    "expeditionBonus": 0.01,
+    "tagBonuses": { "magic": 0.09, "science": 0.03, "investigation": 0.02 },
+    "eventLuckBonus": 0.02,
+    "stressPerRound": 0
+  },
+  "space": {
+    "name": "Кисень і нестабільна орбіта",
+    "description": "Життєзабезпечення щораунду потребує енергії та води. Космічні, технічні й навігаційні компетенції сильніше впливають на зовнішні операції.",
+    "startEffects": { "energy": 3, "water": 2 },
+    "roundEffects": { "energy": -1, "water": -1 },
+    "expeditionBonus": 0.02,
+    "tagBonuses": { "space": 0.08, "technical": 0.04, "navigation": 0.03 },
+    "eventLuckBonus": 0.01,
+    "stressPerRound": 0
+  },
   "postapocalypse": {
     "name": "Закони пустки",
     "description": "Експедиції трохи ефективніші завдяки досвіду виживання, але зношення сховища щораунду знижує цілісність.",

@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { stopChildProcess } = require("./test_support");
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "bunker-validator-"));
 const port = 34700 + Math.floor(Math.random() * 200);
 const base = `http://127.0.0.1:${port}`;
@@ -74,7 +75,8 @@ async function state(code, session) {
   const factions = await create({ mode: "factions", voteVisibility: "open", tieRule: "random", rounds: 4 }); // legacy value migrates to runoff
   await join(factions.code, 2); await join(factions.code, 3); await join(factions.code, 4);
   const factionsState = await state(factions.code, factions);
-  assert.ok(factionsState.configurationAnalysis.issues.some((item) => item.code === "open_hidden_roles"));
+  assert.equal(factionsState.settings.voteVisibility, "secret");
+  assert.ok(!factionsState.configurationAnalysis.issues.some((item) => item.code === "open_hidden_roles"));
   assert.equal(factionsState.settings.tieRule, "runoff");
   assert.ok(!factionsState.configurationAnalysis.issues.some((item) => item.code === "random_tie"));
 
@@ -92,12 +94,12 @@ async function state(code, session) {
   assert.ok(app.includes("function renderConfigurationAnalysis"));
   assert.ok(app.includes("function renderCharacterSetPicker"));
 
-  await new Promise((resolve) => { child.once("exit", resolve); child.kill("SIGTERM"); setTimeout(resolve, 1500); });
+  await stopChildProcess(child);
   fs.rmSync(dataDir, { recursive: true, force: true });
   console.log("Валідатор конфігурації, прогноз тривалості та серверне блокування перевірено.");
 })().catch(async (error) => {
   console.error(error);
-  if (child && !child.killed) await new Promise((resolve) => { child.once("exit", resolve); child.kill("SIGTERM"); setTimeout(resolve, 1500); });
+  if (child && !child.killed) await stopChildProcess(child);
   fs.rmSync(dataDir, { recursive: true, force: true });
   process.exit(1);
 });

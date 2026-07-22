@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { stopChildProcess } = require("./test_support");
 
 const root = __dirname;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "bunker-reasons-"));
@@ -30,8 +31,7 @@ async function state(code, session) {
   return api(`/api/rooms/${code}/state?playerId=${session.playerId}&token=${session.token}`);
 }
 async function stop() {
-  if (!child || child.killed) return;
-  await new Promise((resolve) => { child.once("exit", resolve); child.kill("SIGTERM"); setTimeout(resolve, 1500); });
+  await stopChildProcess(child);
 }
 
 (async () => {
@@ -66,7 +66,8 @@ async function stop() {
   assert.equal(current.game.phase, "operations");
   assert(current.game.operations.expeditions.length > 0);
   assert(current.game.operations.expeditions[0].preview?.label);
-  assert(current.game.operations.expeditions[0].requiredSkills instanceof Array);
+  assert.equal(Object.prototype.hasOwnProperty.call(current.game.operations.expeditions[0], "requiredSkills"), false);
+  assert(/прихованими/i.test(current.game.operations.expeditions[0].preview.explanation));
   assert(current.game.operations.repairPreviews.length > 0);
 
   const route = current.game.operations.expeditions[0];
@@ -92,7 +93,7 @@ async function stop() {
   assert.equal(current.game.phase, "event");
   assert(current.game.event.choices.every((choice) => choice.preview?.explanation && choice.chanceTone));
   const choiceId = current.game.event.choices[0].id;
-  for (const session of sessions) await action(host.code, session, "event_vote", { choiceId });
+  await action(host.code, host, "event_vote", { choiceId });
   await action(host.code, host, "resolve_event");
   current = await state(host.code, host);
   assert(current.game.event.reasonReport, "event reason report missing");
@@ -104,7 +105,7 @@ async function stop() {
 
   await stop();
   fs.rmSync(dataDir, { recursive: true, force: true });
-  console.log("1.1.7: якісні прев’ю, точні післядійні звіти та журнал причин перевірені.");
+  console.log("1.2.10: якісні прев’ю, точні післядійні звіти та журнал причин перевірені.");
 })().catch(async (error) => {
   console.error(error);
   await stop();

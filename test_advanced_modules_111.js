@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { stopChildProcess } = require("./test_support");
 const root = __dirname;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "bunker-modules-"));
 const port = 35000 + Math.floor(Math.random() * 400);
@@ -26,7 +27,9 @@ async function create(modules, suffix) {
   await action(host,host,"start");
   return host;
 }
-async function stop(){ if(!child||child.killed)return; await new Promise(resolve=>{child.once("exit",resolve);child.kill("SIGTERM");setTimeout(resolve,1200);}); }
+async function stop() {
+  await stopChildProcess(child);
+}
 (async()=>{
   child=spawn(process.execPath,["server.js"],{cwd:root,env:{...process.env,PORT:String(port),HOST:"127.0.0.1",DATA_DIR:dataDir},stdio:["ignore","ignore","ignore"]});
   await waitReady();
@@ -65,13 +68,13 @@ async function stop(){ if(!child||child.killed)return; await new Promise(resolve
     assert.equal(s.game.features.hiddenRoles,false); assert.equal(s.game.features.operations,true); assert.equal(s.game.features.treatment,true);
 
     const defaults=await create(undefined,"default"); s=await state(defaults);
-    assert.deepEqual(s.settings.advancedModules,["operations","roles"]);
-    assert.deepEqual(s.game.phaseLoop.map(x=>x.code),["reveal","discussion","operations","intrigue","event","elimination","round_end"]);
+    assert.deepEqual(s.settings.advancedModules,["operations"]);
+    assert.deepEqual(s.game.phaseLoop.map(x=>x.code),["reveal","discussion","operations","event","elimination","round_end"]);
 
     const html=fs.readFileSync(path.join(root,"public","index.html"),"utf8");
     const app=fs.readFileSync(path.join(root,"public","app.js"),"utf8");
     assert(html.includes('id="advancedModulesPicker"')); assert(html.includes('id="lobbyAdvancedModulesPicker"'));
     assert(app.includes("ADVANCED_MODULE_INFO")); assert(app.includes("selectedAdvancedModules"));
-    console.log("1.1.1: модульний розширений режим перевірено.");
+    console.log("1.2.10: модульний розширений режим перевірено.");
   } finally { await stop(); fs.rmSync(dataDir,{recursive:true,force:true}); }
 })().catch(async e=>{console.error(e);await stop();fs.rmSync(dataDir,{recursive:true,force:true});process.exit(1);});

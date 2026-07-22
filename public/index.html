@@ -1,603 +1,656 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="uk">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#121619" />
-  <title>Сховище 1.0.5 — мережева гра</title>
-  <link rel="stylesheet" href="styles.css?v=1.0.5" />
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<meta content="#121619" name="theme-color"/>
+<title>Сховище 1.2.10 — мережева гра</title>
+<link href="styles.css?stage7-v=ui6-stage6-council" rel="stylesheet"/>
 </head>
-<body>
-  <div class="noise"></div>
-  <header class="topbar">
-    <div>
-      <p class="eyebrow">Мережева версія · 1.0.5</p>
-      <h1>СХОВИЩЕ</h1>
-    </div>
-    <div class="top-actions">
-      <a class="button ghost compact-button" href="manage.html">Кабінет 1.0</a><span id="accountBadge" class="badge">Гостьовий режим</span><span id="connectionBadge" class="badge">Не підключено</span>
-      <button id="leaveButton" class="button ghost hidden" type="button">Вийти</button>
-    </div>
-  </header>
+<body class="cinematic-v2 ui5-command">
+<div class="noise"></div>
+<header class="topbar">
+<div>
+<p class="eyebrow">Мережева версія · 1.2.10</p>
+<h1>СХОВИЩЕ</h1>
+</div>
+<div class="top-actions">
+<a class="button ghost compact-button" href="manage.html">Кабінет 1.0</a><span class="badge" id="accountBadge">Гостьовий режим</span><span class="badge" id="connectionBadge">Не підключено</span>
+<button class="button ghost hidden" id="leaveButton" type="button">Вийти</button>
+</div>
+</header>
+<main class="shell">
+<section class="screen active" id="homeScreen">
+<section class="hero panel">
+<div>
+<p class="eyebrow">Приватна гра для друзів</p>
+<h2>Сформуйте групу, яка переживе катастрофу</h2>
+<p class="lead">Створіть приватну партію, надішліть друзям код і починайте відбір. Кожен учасник бачить власне досьє лише на своєму пристрої.</p>
+</div>
+<div class="hero-symbol">⌁</div>
+</section>
+<div class="home-grid">
+<form class="panel form-card" id="createForm">
+<div class="section-title"><div><p class="eyebrow">01</p><h3>Створити кімнату</h3></div></div>
+<div aria-label="Рівень налаштувань" class="setup-level-switch"><button class="active" data-setup-level="quick" type="button">Швидка гра</button><button data-setup-level="custom" type="button">Налаштувати</button><button data-setup-level="expert" type="button">Експертні</button></div>
+<div aria-label="Готові пресети" class="preset-toolbar"><button data-game-preset="classic" type="button">Класичний Бункер</button><button data-game-preset="survival" type="button">Спільне виживання</button><button data-game-preset="detective" type="button">Детектив</button><button data-game-preset="chaos" type="button">Повний хаос</button><button data-game-preset="short" type="button">Коротка партія</button></div>
+<p class="setting-level-note" id="setupLevelNote">Показано лише параметри, потрібні для швидкого старту.</p>
+<label><span>Ваше ім’я</span><input id="createName" maxlength="32" required="" value="Іван"/></label>
+<label><span>Режим гри</span>
+<select id="gameMode">
+<option value="classic">Класичний відбір</option>
+<option value="survival">Спільне виживання</option>
+<option value="factions">Фракції та зрадники</option>
+<option value="advanced">Розширена гра</option>
+</select>
+</label>
+<label class="toggle-card tutorial-mode-toggle" id="tutorialModeCard"><input id="tutorialEnabled" type="checkbox"/><span><strong>Навчальна партія</strong><small>Короткий сценарій на 2 раунди з покроковими підказками, без санкцій у першому раунді.</small></span></label>
+<div class="mode-description" id="modeDescription"></div>
+<details class="setup-details setup-details-rules">
+<summary><span>Як визначається результат</span><small>Короткі правила перемоги та завершення партії</small></summary>
+<div class="victory-rule-preview" id="createVictoryRules"></div>
+</details>
+<section class="advanced-modules-picker hidden" id="advancedModulesPicker">
+<div class="advanced-modules-heading"><div><span>Додаткові системи</span><small>Оберіть не більше двох модулів</small></div><b id="advancedModulesCount">0/2</b></div>
+<div class="advanced-modules-grid" id="advancedModulesGrid"></div>
+<p class="muted advanced-modules-hint" id="advancedModulesHint"></p>
+</section>
+<label><span>Сетинг</span>
+<select id="setting">
+<option value="modern">Наші дні</option>
+<option value="fantasy">Темне фентезі</option>
+<option value="space">Далекий космос</option>
+<option value="postapocalypse">Постапокаліпсис</option>
+<option value="cyberpunk">Кіберпанк</option>
+<option value="horror">Горор</option>
+<option value="detective">Детектив</option>
+</select>
+</label>
+<label><span>Сценарій катастрофи</span><select id="scenarioMode"><option value="procedural">Процедурний — нова комбінація</option><option value="catalog">Каталожний — готовий сценарій</option></select></label>
+<label><span>Кампанія</span><select id="campaignSelect"><option value="">Окрема партія</option></select></label>
+<label><span>Авторський набір</span><select id="contentPackSelect"><option value="">Базовий контент</option></select></label>
+<div class="two-cols">
+<label><span>Очікувано гравців</span><input id="expectedPlayers" max="12" min="1" type="number" value="6"/></label>
+<label><span>Місць у сховищі</span><input id="capacity" max="10" min="1" type="number" value="3"/></label>
+</div>
+<label><span>Раундів</span><input id="rounds" max="7" min="2" type="number" value="4"/></label>
+<label><span>Характеристик за раунд</span><input id="revealsPerRound" max="4" min="1" type="number" value="2"/></label>
+<label class="toggle-card developer-solo-toggle" id="soloTestModeCard"><input id="soloTestMode" type="checkbox"/><span><strong>Соло-тестування</strong><small>Режим розробника: створення й запуск кімнати з одним гравцем.</small></span></label>
+<label class="toggle-card demographics-toggle" id="demographicsCard"><input checked="" id="demographicsEnabled" type="checkbox"/><span><strong>Демографічні обставини</strong><small>Не впливає на поточну корисність; моделюється лише у довгому епілозі.</small></span></label>
+<section class="character-set-picker">
+<label><span>Набір характеристик</span>
+<select id="characterSetMode">
+<option value="compact">Стислий — 8 характеристик</option>
+<option selected="" value="extended">Розширений — усі характеристики</option>
+<option value="custom">Власний набір</option>
+</select>
+</label>
+<p class="muted character-set-hint" id="characterSetHint"></p>
+<div class="character-key-grid hidden" id="customCharacterKeys"></div>
+</section>
+<div class="voting-settings" id="votingSettings">
+<label><span>Рішення громади</span><select id="voteSystem"><option value="exile">Лише вигнання</option><option value="tribunal">Трибунал: 3 види санкцій</option></select></label>
+<label><span>Видимість голосів</span><select id="voteVisibility"><option value="secret">Таємні</option><option value="open">Відкриті</option></select></label>
+<label><span>Нічия</span><select id="tieRule"><option selected="" value="runoff">Переголосування між лідерами</option><option value="no_action">Одразу без санкцій</option></select></label>
+</div>
+<section class="automation-settings-card">
+<div><span>Ведення партії</span><small>Захист від простою та відсутніх гравців</small></div>
+<label><span>Режим</span><select id="automationMode"><option value="off">Ручний</option><option value="assist">Допоміжний</option><option value="auto">Автоматичний ведучий</option></select></label>
+<label><span>Відсутність, с</span><input id="inactivityTimeoutSeconds" max="600" min="15" type="number" value="90"/></label>
+<label><span>Ліміт фази, с</span><input id="phaseTimeoutSeconds" max="1800" min="30" type="number" value="180"/></label>
+<label class="toggle-card compact-toggle"><input checked="" id="hostFailoverEnabled" type="checkbox"/><span><strong>Автоматична заміна хоста</strong><small>Передати ведення підключеному гравцеві, якщо хост довго відсутній.</small></span></label>
+<label><span>Заміна хоста через, с</span><input id="hostFailoverSeconds" max="900" min="15" type="number" value="120"/></label>
+<p class="muted">Нейтральний бот лише пропускає дію або утримується. Він не використовує здібності, предмети чи ресурси.</p>
+</section>
+<label><span>Абсурдність: <strong id="absurdityText">2 — збалансовано</strong></span><input id="absurdity" max="4" min="0" type="range" value="2"/></label>
+<section class="seed-settings-card">
+<div><span>Seed генерації</span><small>Порожнє поле — автоматичний seed</small></div>
+<label><span>Код відтворення</span><input autocomplete="off" class="seed-input" id="generationSeed" maxlength="32" placeholder="Наприклад, TEST-2026" spellcheck="false"/></label>
+<button class="button ghost" id="randomizeGenerationSeed" type="button">Створити seed</button>
+<p class="muted">Seed повторює роздачу лише за тієї самої кампанійної спадщини, версії контенту, налаштувань і кількості гравців.</p>
+</section>
+<details class="setup-details setup-details-analysis">
+<summary><span>Перевірка конфігурації</span><small>Відкрийте, щоб переглянути тривалість і можливі проблеми</small><b id="createConfigurationStatus">—</b></summary>
+<div aria-live="polite" class="configuration-analysis-panel">
+<div class="configuration-analysis" id="createConfigurationAnalysis"></div>
+</div>
+</details>
+<button class="button primary full" type="submit">Створити кімнату</button>
+</form>
+<form class="panel form-card" id="joinForm">
+<div class="section-title"><div><p class="eyebrow">02</p><h3>Приєднатися</h3></div></div>
+<label><span>Ваше ім’я</span><input id="joinName" maxlength="32" required=""/></label>
+<label><span>Код кімнати <small>(6 символів)</small></span><input aria-describedby="joinCodeHint" autocapitalize="characters" autocomplete="off" class="code-input" id="joinCode" maxlength="10" placeholder="ABC123" required="" spellcheck="false"/></label>
+<p class="field-hint" id="joinCodeHint">Введіть шестисимвольний код, який надіслав ведучий.</p>
+<button class="button secondary full" type="submit">Увійти до кімнати</button>
+<div class="divider"><span>або</span></div>
+<button class="button ghost full hidden" id="resumeButton" type="button">Відновити останній сеанс</button>
+<details class="recovery-entry-details" id="recoveryEntryDetails">
+<summary>Повернути свого персонажа за персональним кодом</summary>
+<div class="nested-form" id="rejoinForm">
+<label><span>Код кімнати <small>(6 символів)</small></span><input autocapitalize="characters" autocomplete="off" class="code-input" id="rejoinRoomCode" maxlength="6" minlength="6" placeholder="ABC123" spellcheck="false"/></label>
+<label><span>Персональний код <small>(10 символів)</small></span><input autocapitalize="characters" autocomplete="off" class="code-input recovery-code-input" id="rejoinRecoveryCode" maxlength="10" minlength="10" placeholder="ABCD23EFGH" spellcheck="false"/></label>
+<p class="field-hint">Це два різні коди: спочатку код кімнати, нижче — ваш персональний код із картки «Сеанс і ведучий».</p>
+<button class="button secondary full" id="rejoinSubmit" type="button">Відновити за кодом</button>
+</div>
+<div class="divider"><span>немає коду</span></div>
+<div class="nested-form" id="recoveryRequestForm">
+<label><span>Код кімнати <small>(6 символів)</small></span><input autocapitalize="characters" autocomplete="off" class="code-input" id="recoveryRequestRoomCode" maxlength="6" minlength="6" placeholder="ABC123" spellcheck="false"/></label>
+<label><span>Ім’я у партії</span><input id="recoveryRequestName" maxlength="32"/></label>
+<button class="button ghost full" id="recoveryRequestSubmit" type="button">Запросити підтвердження хоста</button>
+</div>
+<p class="muted" id="recoveryRequestStatus"></p>
+</details>
+<details class="secondary-links"><summary>Додаткові способи входу</summary><a class="button ghost full" href="local/index.html">Архівна локальна версія 0.5</a></details>
+</form>
+</div>
+<section class="panel instruction-panel">
+<p class="eyebrow">Запуск через інтернет</p>
+<p>Запустіть <strong>start_internet.bat</strong>. Він відкриє сервер гри й LocalTunnel. Посилання <strong>https://…loca.lt</strong> надішліть друзям разом із кодом кімнати.</p>
+</section>
+</section>
+<section class="screen" id="roomScreen">
+<section class="room-banner panel">
+<div>
+<p class="eyebrow">Код кімнати</p>
+<button class="room-code" id="roomCode" title="Скопіювати код" type="button">------</button>
+<p class="muted">Натисніть код, щоб скопіювати.</p>
+</div>
+<div class="room-settings" id="roomSettings"></div>
+<button class="button ghost lobby-parameters-button" id="openLobbyDrawer" type="button">Параметри</button></section><div class="lobby-command-layout"><section class="lobby-command-main"><section class="panel lobby-briefing-card"><div class="lobby-briefing-copy"><p class="eyebrow">Передстартовий відсік</p><h2>Група готується до закриття гермодверей</h2><p class="muted">Перевірте склад групи, підтвердьте готовність і починайте партію. Технічні параметри сховані в окремій панелі.</p></div><div class="lobby-briefing-status"><span class="lobby-status-label">Поточний стан</span><strong id="lobbyBriefingStatus">Очікування учасників</strong></div></section><section class="panel">
+<div class="section-title"><div><p class="eyebrow">Лобі</p><h3>Гравці</h3></div><span class="badge" id="playerCount">0/12</span></div>
+<div class="lobby-list" id="lobbyPlayers"></div>
+</section><section class="panel lobby-controls">
+<p class="eyebrow">Готовність</p>
+<h3 id="lobbyTitle">Очікування гравців</h3>
+<p class="muted" id="lobbyMinimumHint">Потрібно щонайменше четверо. Після старту нові гравці вже не зможуть приєднатися.</p>
+<button class="button secondary full" id="readyButton" type="button">Я готовий</button>
+<button class="button primary full hidden" id="startButton" type="button">Почати партію</button>
+<p class="error-text" id="lobbyError"></p>
+</section></section><aside class="panel lobby-summary-rail"><div><p class="eyebrow">Коротко про партію</p><h3>Перед запуском</h3></div><div class="lobby-summary-stack"><div><span>Код кімнати</span><strong id="lobbySummaryRoomCode">------</strong></div><div><span>Учасники</span><strong id="lobbySummaryPlayers">0</strong></div><div><span>Готові</span><strong id="lobbySummaryReady">0</strong></div><div><span>Місць у сховищі</span><strong id="lobbySummaryCapacity">—</strong></div></div><button class="button ghost full" id="openLobbyDrawerSecondary" type="button">Відкрити параметри</button></aside></div>
 
-  <main class="shell">
-    <section id="homeScreen" class="screen active">
-      <section class="hero panel">
-        <div>
-          <p class="eyebrow">Приватна гра для друзів</p>
-          <h2>Кожен бачить свою картку на власному пристрої</h2>
-          <p class="lead">Створіть кімнату, надішліть друзям адресу сервера й код. У версії 1.0.5 доступні сім окремих сетингів і справжня довгострокова симуляція фіналу: дні, місяці та роки після відбору, персональні конфлікти, хвороби, смерті, народження й розвиток поселення.</p>
-        </div>
-        <div class="hero-symbol">⌁</div>
-      </section>
 
-      <div class="home-grid">
-        <form id="createForm" class="panel form-card">
-          <div class="section-title"><div><p class="eyebrow">01</p><h3>Створити кімнату</h3></div></div>
-          <label><span>Ваше ім’я</span><input id="createName" required maxlength="32" value="Іван" /></label>
-          <label><span>Режим гри</span>
-            <select id="gameMode">
-              <option value="classic">Класичний відбір</option>
-              <option value="survival">Спільне виживання</option>
-              <option value="factions">Фракції та зрадники</option>
-              <option value="advanced">Розширена гра</option>
-            </select>
-          </label>
-          <div id="modeDescription" class="mode-description"></div>
-          <div id="createVictoryRules" class="victory-rule-preview"></div>
-          <section id="advancedModulesPicker" class="advanced-modules-picker hidden">
-            <div class="advanced-modules-heading"><div><span>Додаткові системи</span><small>Оберіть не більше двох модулів</small></div><b id="advancedModulesCount">0/2</b></div>
-            <div id="advancedModulesGrid" class="advanced-modules-grid"></div>
-            <p id="advancedModulesHint" class="muted advanced-modules-hint"></p>
-          </section>
-          <label><span>Сетинг</span>
-            <select id="setting">
-              <option value="modern">Наші дні</option>
-              <option value="fantasy">Темне фентезі</option>
-              <option value="space">Далекий космос</option>
-              <option value="postapocalypse">Постапокаліпсис</option>
-              <option value="cyberpunk">Кіберпанк</option>
-              <option value="horror">Горор</option>
-              <option value="detective">Детектив</option>
-            </select>
-          </label>
-          <label><span>Сценарій катастрофи</span><select id="scenarioMode"><option value="procedural">Процедурний — нова комбінація</option><option value="catalog">Каталожний — готовий сценарій</option></select></label>
-          <label><span>Кампанія</span><select id="campaignSelect"><option value="">Окрема партія</option></select></label>
-          <label><span>Авторський набір</span><select id="contentPackSelect"><option value="">Базовий контент</option></select></label>
-          <div class="two-cols">
-            <label><span>Очікувано гравців</span><input id="expectedPlayers" type="number" min="4" max="12" value="6" /></label>
-            <label><span>Місць у сховищі</span><input id="capacity" type="number" min="2" max="10" value="3" /></label>
-          </div>
-          <label><span>Раундів</span><input id="rounds" type="number" min="2" max="7" value="4" /></label>
-          <label><span>Характеристик за раунд</span><input id="revealsPerRound" type="number" min="1" max="4" value="2" /></label>
-          <label id="demographicsCard" class="toggle-card demographics-toggle"><input id="demographicsEnabled" type="checkbox" checked /><span><strong>Демографічні обставини</strong><small>Не впливає на поточну корисність; моделюється лише у довгому епілозі.</small></span></label>
-          <section class="character-set-picker">
-            <label><span>Набір характеристик</span>
-              <select id="characterSetMode">
-                <option value="compact">Стислий — 8 характеристик</option>
-                <option value="extended">Розширений — усі характеристики</option>
-                <option value="custom">Власний набір</option>
-              </select>
-            </label>
-            <p id="characterSetHint" class="muted character-set-hint"></p>
-            <div id="customCharacterKeys" class="character-key-grid hidden"></div>
-          </section>
-          <div id="votingSettings" class="voting-settings">
-            <label><span>Рішення громади</span><select id="voteSystem"><option value="exile">Лише вигнання</option><option value="tribunal">Трибунал: 3 види санкцій</option></select></label>
-            <label><span>Видимість голосів</span><select id="voteVisibility"><option value="secret">Таємні</option><option value="open">Відкриті</option></select></label>
-            <label><span>Нічия</span><select id="tieRule"><option value="runoff" selected>Переголосування між лідерами</option><option value="no_action">Одразу без санкцій</option></select></label>
-          </div>
-          <section class="automation-settings-card">
-            <div><span>Ведення партії</span><small>Захист від простою та відсутніх гравців</small></div>
-            <label><span>Режим</span><select id="automationMode"><option value="off">Ручний</option><option value="assist">Допоміжний</option><option value="auto">Автоматичний ведучий</option></select></label>
-            <label><span>Відсутність, с</span><input id="inactivityTimeoutSeconds" type="number" min="15" max="600" value="90" /></label>
-            <label><span>Ліміт фази, с</span><input id="phaseTimeoutSeconds" type="number" min="30" max="1800" value="180" /></label>
-            <label class="toggle-card compact-toggle"><input id="hostFailoverEnabled" type="checkbox" checked /><span><strong>Автоматична заміна хоста</strong><small>Передати ведення підключеному гравцеві, якщо хост довго відсутній.</small></span></label>
-            <label><span>Заміна хоста через, с</span><input id="hostFailoverSeconds" type="number" min="15" max="900" value="120" /></label>
-            <p class="muted">Нейтральний бот лише пропускає дію або утримується. Він не використовує здібності, предмети чи ресурси.</p>
-          </section>
-          <label><span>Абсурдність: <strong id="absurdityText">2 — збалансовано</strong></span><input id="absurdity" type="range" min="0" max="4" value="2" /></label>
-          <section class="configuration-analysis-panel" aria-live="polite">
-            <div class="configuration-analysis-heading"><div><span>Перевірка конфігурації</span><small>Попередня оцінка до створення кімнати</small></div><b id="createConfigurationStatus">—</b></div>
-            <div id="createConfigurationAnalysis" class="configuration-analysis"></div>
-          </section>
-          <button class="button primary full" type="submit">Створити кімнату</button>
-        </form>
 
-        <form id="joinForm" class="panel form-card">
-          <div class="section-title"><div><p class="eyebrow">02</p><h3>Приєднатися</h3></div></div>
-          <label><span>Ваше ім’я</span><input id="joinName" required maxlength="32" /></label>
-          <label><span>Код кімнати</span><input id="joinCode" required maxlength="6" class="code-input" placeholder="ABC123" /></label>
-          <button class="button secondary full" type="submit">Увійти до кімнати</button>
-          <div class="divider"><span>або</span></div>
-          <button id="resumeButton" class="button ghost full hidden" type="button">Відновити останній сеанс</button>
-          <details class="recovery-entry-details">
-            <summary>Увійти на іншому пристрої</summary>
-            <div id="rejoinForm" class="nested-form">
-              <label><span>Код кімнати</span><input id="rejoinRoomCode" maxlength="6" class="code-input" placeholder="ABC123" /></label>
-              <label><span>Персональний код</span><input id="rejoinRecoveryCode" maxlength="12" class="code-input" placeholder="ABCD23EFGH" /></label>
-              <button id="rejoinSubmit" class="button secondary full" type="button">Відновити за кодом</button>
-            </div>
-            <div class="divider"><span>немає коду</span></div>
-            <div id="recoveryRequestForm" class="nested-form">
-              <label><span>Код кімнати</span><input id="recoveryRequestRoomCode" maxlength="6" class="code-input" placeholder="ABC123" /></label>
-              <label><span>Ім’я у партії</span><input id="recoveryRequestName" maxlength="32" /></label>
-              <button id="recoveryRequestSubmit" class="button ghost full" type="button">Запросити підтвердження хоста</button>
-            </div>
-            <p id="recoveryRequestStatus" class="muted"></p>
-          </details>
-          <a class="button ghost full" href="local/index.html">Архівна локальна версія 0.5 · старі правила</a>
-        </form>
-      </div>
 
-      <section class="panel instruction-panel">
-        <p class="eyebrow">Запуск через інтернет</p>
-        <p>Запустіть <strong>start_internet.bat</strong>. Він відкриє сервер гри й LocalTunnel. Посилання <strong>https://…loca.lt</strong> надішліть друзям разом із кодом кімнати.</p>
-      </section>
-    </section>
 
-    <section id="roomScreen" class="screen">
-      <section class="room-banner panel">
-        <div>
-          <p class="eyebrow">Код кімнати</p>
-          <button id="roomCode" class="room-code" type="button" title="Скопіювати код">------</button>
-          <p class="muted">Натисніть код, щоб скопіювати.</p>
-        </div>
-        <div class="room-settings" id="roomSettings"></div>
-      </section>
-      <section id="lobbyVictoryPanel" class="panel lobby-victory-panel">
-        <div class="section-title compact-title"><div><p class="eyebrow">Правила результату</p><h3>Як визначається перемога</h3></div><span class="badge">Відомо всім</span></div>
-        <div id="lobbyVictoryRules" class="victory-rule-grid"></div>
-        <p id="lobbyEndCondition" class="victory-end-condition muted"></p>
-      </section>
-      <section id="lobbyConfigurationPanel" class="panel lobby-configuration-panel">
-        <div class="section-title compact-title"><div><p class="eyebrow">Перевірка конфігурації</p><h3>Чи підходять налаштування цій групі</h3></div><span id="lobbyConfigurationStatus" class="badge">—</span></div>
-        <div id="lobbyConfigurationAnalysis" class="configuration-analysis"></div>
-      </section>
+<div class="lobby-drawer-backdrop hidden" id="lobbyDrawerBackdrop"><aside aria-hidden="true" class="lobby-config-drawer" id="lobbyConfigDrawer"><header class="lobby-drawer-header"><div><p class="eyebrow">Параметри партії</p><h2>Система підготовки</h2></div><button aria-label="Закрити параметри" class="button ghost lobby-drawer-close" id="closeLobbyDrawer" type="button">×</button></header><nav aria-label="Розділи параметрів" class="lobby-drawer-nav"><button class="active" data-lobby-drawer-tab="overview" type="button">Огляд</button><button data-lobby-drawer-tab="access" type="button">Доступ</button><button data-lobby-drawer-tab="settings" type="button">Налаштування</button></nav><div class="lobby-drawer-panel active" data-lobby-drawer-panel="overview"><section aria-live="polite" class="panel generation-panel" id="lobbyGenerationPanel">
+<div class="section-title compact-title"><div><p class="eyebrow">Відтворювана партія</p><h3>Seed і діагностичний код</h3></div><span class="badge" id="lobbyGenerationSchema"></span></div>
+<div class="generation-code-grid"><article><small>Seed</small><strong id="lobbyGenerationSeedValue">—</strong><button class="button ghost" id="lobbyCopyGenerationSeed" type="button">Копіювати</button></article><article><small>Код конфігурації</small><strong id="lobbyGenerationConfigCode">—</strong><button class="button ghost" id="lobbyCopyGenerationConfig" type="button">Копіювати</button></article><article class="hidden" id="lobbyGenerationFingerprintCard"><small>Відбиток роздачі</small><strong id="lobbyGenerationFingerprint">—</strong></article></div>
+<p class="muted" id="lobbyGenerationNote"></p>
+</section><section class="panel lobby-victory-panel" id="lobbyVictoryPanel">
+<div class="section-title compact-title"><div><p class="eyebrow">Правила результату</p><h3>Як визначається перемога</h3></div><span class="badge">Відомо всім</span></div>
+<div class="victory-rule-grid" id="lobbyVictoryRules"></div>
+<p class="victory-end-condition muted" id="lobbyEndCondition"></p>
+</section><section class="panel lobby-configuration-panel" id="lobbyConfigurationPanel">
+<div class="section-title compact-title"><div><p class="eyebrow">Перевірка конфігурації</p><h3>Чи підходять налаштування цій групі</h3></div><span class="badge" id="lobbyConfigurationStatus">—</span></div>
+<div class="configuration-analysis" id="lobbyConfigurationAnalysis"></div>
+</section></div><div class="lobby-drawer-panel" data-lobby-drawer-panel="access"><section class="panel session-management-panel" id="lobbySessionPanel">
+<div class="section-title compact-title"><div><p class="eyebrow">Доступ до партії</p><h3>Сеанс і ведучий</h3></div><span class="badge" id="lobbySessionHostBadge"></span></div>
+<div class="session-management-grid">
+<article class="recovery-code-card"><small>Мій персональний код</small><strong id="lobbyRecoveryCode">----------</strong><p>Збережіть його, щоб увійти з іншого браузера або пристрою.</p><div><button class="button ghost" id="lobbyCopyRecoveryCode" type="button">Копіювати</button><button class="button ghost" id="lobbyRegenerateRecoveryCode" type="button">Створити новий</button></div></article>
+<article class="host-transfer-card hidden" id="lobbyHostManagement"><small>Керування ведучим</small><label><span>Передати права</span><select id="lobbyHostTransferTarget"></select></label><button class="button secondary" id="lobbyTransferHost" type="button">Передати права хоста</button><label class="toggle-card compact-toggle"><input id="lobbyHostFailoverEnabled" type="checkbox"/><span><strong>Автоматична заміна</strong><small>Якщо хост довго не відповідає.</small></span></label><label><span>Через, с</span><input id="lobbyHostFailoverSeconds" max="900" min="15" type="number"/></label><button class="button ghost" id="lobbySaveHostFailover" type="button">Зберегти резервне ведення</button></article>
+</div>
+<div class="recovery-request-list hidden" id="lobbyRecoveryRequests"></div>
+</section></div><div class="lobby-drawer-panel" data-lobby-drawer-panel="settings"><section class="panel full-span lobby-settings-panel hidden" id="lobbySettingsPanel">
+<div class="section-title"><div><p class="eyebrow">Налаштування кімнати</p><h3>Змінити перед початком</h3></div><span class="badge accent">Лише хост</span></div>
+<p class="muted">Після збереження інші гравці повинні знову підтвердити готовність. Створювати нову кімнату не потрібно.</p>
+<div class="lobby-settings-grid">
+<label><span>Режим гри</span><select id="lobbyGameMode"><option value="classic">Класичний відбір</option><option value="survival">Спільне виживання</option><option value="factions">Фракції та зрадники</option><option value="advanced">Розширена гра</option></select></label>
+<label class="toggle-card lobby-toggle tutorial-mode-toggle" id="lobbyTutorialModeCard"><input id="lobbyTutorialEnabled" type="checkbox"/><span><strong>Навчальна партія</strong><small>Фіксований двораундовий вступ із підказками.</small></span></label>
+<label><span>Сетинг</span><select id="lobbySetting"><option value="modern">Наші дні</option><option value="fantasy">Темне фентезі</option><option value="space">Далекий космос</option><option value="postapocalypse">Постапокаліпсис</option><option value="cyberpunk">Кіберпанк</option><option value="horror">Горор</option><option value="detective">Детектив</option></select></label>
+<label><span>Сценарій катастрофи</span><select id="lobbyScenarioMode"><option value="procedural">Процедурний</option><option value="catalog">Каталожний</option></select></label>
+<section class="seed-settings-card lobby-seed-settings">
+<div><span>Seed генерації</span><small>Зміна seed змінить стартову роздачу</small></div>
+<label><span>Код відтворення</span><input autocomplete="off" class="seed-input" id="lobbyGenerationSeed" maxlength="32" spellcheck="false"/></label>
+<button class="button ghost" id="lobbyRandomizeGenerationSeed" type="button">Новий seed</button>
+</section>
+<label><span>Кампанія</span><select id="lobbyCampaign"><option value="">Окрема партія</option></select></label>
+<label><span>Авторський набір</span><select id="lobbyContentPack"><option value="">Базовий контент</option></select></label>
+<label><span>Місць у сховищі</span><input id="lobbyCapacity" max="10" min="1" type="number"/></label>
+<label><span>Раундів</span><input id="lobbyRounds" max="7" min="2" type="number"/></label>
+<label><span>Характеристик за раунд</span><input id="lobbyReveals" max="4" min="1" type="number"/></label>
+<label class="toggle-card lobby-toggle developer-solo-toggle" id="lobbySoloTestModeCard"><input id="lobbySoloTestMode" type="checkbox"/><span><strong>Соло-тестування</strong><small>Дозволяє запуск із одним гравцем для локальної перевірки.</small></span></label>
+<section class="advanced-modules-picker lobby-advanced-modules-picker hidden" id="lobbyAdvancedModulesPicker">
+<div class="advanced-modules-heading"><div><span>Додаткові системи</span><small>Оберіть не більше двох модулів</small></div><b id="lobbyAdvancedModulesCount">0/2</b></div>
+<div class="advanced-modules-grid" id="lobbyAdvancedModulesGrid"></div>
+<p class="muted advanced-modules-hint" id="lobbyAdvancedModulesHint"></p>
+</section>
+<label class="toggle-card lobby-toggle demographics-toggle" id="lobbyDemographicsCard"><input checked="" id="lobbyDemographicsEnabled" type="checkbox"/><span><strong>Демографічні обставини</strong><small>Не впливає на поточну корисність; моделюється лише у довгому епілозі.</small></span></label>
+<section class="character-set-picker lobby-character-set-picker">
+<label><span>Набір характеристик</span>
+<select id="lobbyCharacterSetMode">
+<option value="compact">Стислий — 8 характеристик</option>
+<option selected="" value="extended">Розширений — усі характеристики</option>
+<option value="custom">Власний набір</option>
+</select>
+</label>
+<p class="muted character-set-hint" id="lobbyCharacterSetHint"></p>
+<div class="character-key-grid hidden" id="lobbyCustomCharacterKeys"></div>
+</section>
+<label class="vote-setting-field"><span>Рішення громади</span><select id="lobbyVoteSystem"><option value="exile">Лише вигнання</option><option value="tribunal">Трибунал: 3 санкції</option></select></label>
+<label class="vote-setting-field"><span>Видимість голосів</span><select id="lobbyVoteVisibility"><option value="secret">Таємні</option><option value="open">Відкриті</option></select></label>
+<label class="vote-setting-field"><span>Нічия</span><select id="lobbyTieRule"><option value="runoff">Переголосування між лідерами</option><option value="no_action">Одразу без санкцій</option></select></label>
+<section class="automation-settings-card lobby-automation-settings">
+<div><span>Ведення партії</span><small>Захист від простою</small></div>
+<label><span>Режим</span><select id="lobbyAutomationMode"><option value="off">Ручний</option><option value="assist">Допоміжний</option><option value="auto">Автоматичний ведучий</option></select></label>
+<label><span>Відсутність, с</span><input id="lobbyInactivityTimeoutSeconds" max="600" min="15" type="number"/></label>
+<label><span>Ліміт фази, с</span><input id="lobbyPhaseTimeoutSeconds" max="1800" min="30" type="number"/></label>
+<label class="toggle-card compact-toggle"><input id="lobbySettingsHostFailoverEnabled" type="checkbox"/><span><strong>Автоматична заміна хоста</strong><small>Резервний ведучий після тривалої відсутності.</small></span></label>
+<label><span>Заміна хоста через, с</span><input id="lobbySettingsHostFailoverSeconds" max="900" min="15" type="number"/></label>
+</section>
+<label><span>Абсурдність</span><select id="lobbyAbsurdity"><option value="0">0 — серйозно</option><option value="1">1 — трохи дивного</option><option value="2">2 — збалансовано</option><option value="3">3 — багато гумору</option><option value="4">4 — повний хаос</option></select></label>
+</div>
+<div class="mode-description" id="lobbyModeDescription"></div>
+<div class="victory-rule-preview" id="lobbyVictoryPreview"></div>
+<button class="button secondary" id="saveLobbySettings" type="button">Зберегти налаштування</button>
+</section></div></aside></div></section>
+<section class="screen" id="gameScreen">
+<article aria-label="Катастрофа" class="panel danger compact-panel world-panel catastrophe-screen" data-game-tab-panel="catastrophe" role="tabpanel">
+<header class="catastrophe-hero">
+<div class="catastrophe-hero-copy"><p class="eyebrow">Аварійний звіт</p><h2 id="catastropheTitle"></h2><p class="catastrophe-summary" id="catastropheDescription"></p></div>
+<div class="catastrophe-threat-block"><small>Головна загроза</small><strong id="catastropheThreat"></strong></div>
+</header>
+<div class="scenario-module-grid catastrophe-facts" id="catastropheModules"></div>
+<section aria-labelledby="scenarioPrioritiesTitle" class="scenario-priorities" id="scenarioPriorities">
+<div class="scenario-priorities-heading">
+<div><p class="eyebrow">Короткий брифінг</p><h3 id="scenarioPrioritiesTitle">На що звернути увагу</h3></div>
+<span class="badge">3 · 3 · 2 · 1</span>
+</div>
+<div class="scenario-priority-grid">
+<article class="scenario-priority-column threat-column"><h4>3 головні загрози</h4><div class="scenario-priority-list" id="scenarioPriorityThreats"></div></article>
+<article class="scenario-priority-column need-column"><h4>3 критичні потреби</h4><div class="scenario-priority-list" id="scenarioPriorityNeeds"></div></article>
+<article class="scenario-priority-column condition-column"><h4>2 особливі умови</h4><div class="scenario-priority-list" id="scenarioPriorityConditions"></div></article>
+</div>
+<article class="scenario-long-term-risk" id="scenarioPriorityLongTerm"></article>
+</section>
+<article class="scenario-complication" id="catastropheComplication"></article>
+<details class="catastrophe-lore">
+<summary>Повний контекст катастрофи</summary>
+<div class="lore-grid">
+<article><small>Передумови</small><p id="catastropheCause"></p></article>
+<article><small>Падіння світу</small><p id="catastropheCollapse"></p></article>
+<article><small>Поверхня зараз</small><p id="catastropheSurface"></p></article>
+<article><small>Довгострокова перспектива</small><p id="catastropheHorizon"></p></article>
+</div>
+</details>
+</article><article aria-label="Сховище" class="panel compact-panel world-panel shelter-screen" data-game-tab-panel="shelter" role="tabpanel">
+<header class="shelter-command-header"><div class="shelter-heading"><div><p class="eyebrow">Інженерний статус комплексу</p><h2 id="shelterTitle"></h2></div><p class="muted" id="shelterDescription"></p></div><div class="shelter-schematic" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div></header>
+<div class="shelter-facts" id="shelterFacts"></div>
+<details class="shelter-manifest">
+<summary>План приміщень і стартовий провіант</summary>
+<div class="shelter-detail-grid">
+<section><h4>Приміщення</h4><div class="room-list" id="shelterRooms"></div></section>
+<section><h4>Провіант на старті</h4><div class="provision-list" id="shelterProvisions"></div><p class="manifest-note">Маніфест показує номінальний запас усього комплексу, розрахований на його проєктну місткість. Ресурсні шкали нижче враховують доступність, псування, тиск катастрофи та випадковий стан запасів цієї партії.</p></section>
+</div>
+</details>
+<section class="shelter-status-section"><div class="world-section-heading"><div><p class="eyebrow">Життєзабезпечення</p><h3>Ключові ресурси</h3></div><small>Оцінка доступності для поточної групи</small></div><div class="resource-grid" id="resources"></div></section>
+<section class="shelter-status-section"><div class="world-section-heading"><div><p class="eyebrow">Інженерні модулі</p><h3>Стан систем</h3></div><small>Аварійні модулі потребують пріоритетної уваги</small></div><div class="module-grid" id="modules"></div></section>
+<div class="assets" id="assets"></div>
+</article>
+<section aria-live="polite" class="panel campaign-legacy-panel compact-panel hidden" data-game-tab-panel="shelter" id="campaignLegacyPanel" role="tabpanel">
+<div class="campaign-legacy-head">
+<div><p class="eyebrow">Кампанійна спадщина</p><h3 id="campaignLegacyTitle">Перевага з ціною</h3></div>
+<span class="badge" id="campaignLegacyDeadline"></span>
+</div>
+<p class="muted" id="campaignLegacySource"></p>
+<div class="campaign-legacy-summary"><strong id="campaignLegacyBenefit"></strong><p id="campaignLegacyContext"></p><small id="campaignLegacyStarting"></small></div>
+<div class="campaign-legacy-options" id="campaignLegacyOptions"></div>
+<div class="campaign-legacy-footer">
+<p class="muted" id="campaignLegacyStatus"></p>
+<button class="button secondary hidden" id="campaignLegacyResolve" type="button">Завершити рішення</button>
+</div>
+<article class="campaign-legacy-result hidden" id="campaignLegacyResult"></article>
+</section>
 
-      <section id="lobbySessionPanel" class="panel session-management-panel">
-        <div class="section-title compact-title"><div><p class="eyebrow">Доступ до партії</p><h3>Сеанс і ведучий</h3></div><span id="lobbySessionHostBadge" class="badge"></span></div>
-        <div class="session-management-grid">
-          <article class="recovery-code-card"><small>Мій персональний код</small><strong id="lobbyRecoveryCode">----------</strong><p>Збережіть його, щоб увійти з іншого браузера або пристрою.</p><div><button id="lobbyCopyRecoveryCode" class="button ghost" type="button">Копіювати</button><button id="lobbyRegenerateRecoveryCode" class="button ghost" type="button">Створити новий</button></div></article>
-          <article id="lobbyHostManagement" class="host-transfer-card hidden"><small>Керування ведучим</small><label><span>Передати права</span><select id="lobbyHostTransferTarget"></select></label><button id="lobbyTransferHost" class="button secondary" type="button">Передати права хоста</button><label class="toggle-card compact-toggle"><input id="lobbyHostFailoverEnabled" type="checkbox" /><span><strong>Автоматична заміна</strong><small>Якщо хост довго не відповідає.</small></span></label><label><span>Через, с</span><input id="lobbyHostFailoverSeconds" type="number" min="15" max="900" /></label><button id="lobbySaveHostFailover" class="button ghost" type="button">Зберегти резервне ведення</button></article>
-        </div>
-        <div id="lobbyRecoveryRequests" class="recovery-request-list hidden"></div>
-      </section>
-      <div class="room-grid">
-        <section class="panel">
-          <div class="section-title"><div><p class="eyebrow">Лобі</p><h3>Гравці</h3></div><span id="playerCount" class="badge">0/12</span></div>
-          <div id="lobbyPlayers" class="lobby-list"></div>
-        </section>
-        <section class="panel lobby-controls">
-          <p class="eyebrow">Готовність</p>
-          <h3 id="lobbyTitle">Очікування гравців</h3>
-          <p class="muted">Потрібно щонайменше четверо. Після старту нові гравці вже не зможуть приєднатися.</p>
-          <button id="readyButton" class="button secondary full" type="button">Я готовий</button>
-          <button id="startButton" class="button primary full hidden" type="button">Почати партію</button>
-          <p id="lobbyError" class="error-text"></p>
-        </section>
-        <section id="lobbySettingsPanel" class="panel full-span lobby-settings-panel hidden">
-          <div class="section-title"><div><p class="eyebrow">Налаштування кімнати</p><h3>Змінити перед початком</h3></div><span class="badge accent">Лише хост</span></div>
-          <p class="muted">Після збереження інші гравці повинні знову підтвердити готовність. Створювати нову кімнату не потрібно.</p>
-          <div class="lobby-settings-grid">
-            <label><span>Режим гри</span><select id="lobbyGameMode"><option value="classic">Класичний відбір</option><option value="survival">Спільне виживання</option><option value="factions">Фракції та зрадники</option><option value="advanced">Розширена гра</option></select></label>
-            <label><span>Сетинг</span><select id="lobbySetting"><option value="modern">Наші дні</option><option value="fantasy">Темне фентезі</option><option value="space">Далекий космос</option><option value="postapocalypse">Постапокаліпсис</option><option value="cyberpunk">Кіберпанк</option><option value="horror">Горор</option><option value="detective">Детектив</option></select></label>
-            <label><span>Сценарій катастрофи</span><select id="lobbyScenarioMode"><option value="procedural">Процедурний</option><option value="catalog">Каталожний</option></select></label>
-            <label><span>Кампанія</span><select id="lobbyCampaign"><option value="">Окрема партія</option></select></label>
-            <label><span>Авторський набір</span><select id="lobbyContentPack"><option value="">Базовий контент</option></select></label>
-            <label><span>Місць у сховищі</span><input id="lobbyCapacity" type="number" min="2" max="10" /></label>
-            <label><span>Раундів</span><input id="lobbyRounds" type="number" min="2" max="7" /></label>
-            <label><span>Характеристик за раунд</span><input id="lobbyReveals" type="number" min="1" max="4" /></label>
-            <section id="lobbyAdvancedModulesPicker" class="advanced-modules-picker lobby-advanced-modules-picker hidden">
-              <div class="advanced-modules-heading"><div><span>Додаткові системи</span><small>Оберіть не більше двох модулів</small></div><b id="lobbyAdvancedModulesCount">0/2</b></div>
-              <div id="lobbyAdvancedModulesGrid" class="advanced-modules-grid"></div>
-              <p id="lobbyAdvancedModulesHint" class="muted advanced-modules-hint"></p>
-            </section>
-            <label id="lobbyDemographicsCard" class="toggle-card lobby-toggle demographics-toggle"><input id="lobbyDemographicsEnabled" type="checkbox" checked /><span><strong>Демографічні обставини</strong><small>Не впливає на поточну корисність; моделюється лише у довгому епілозі.</small></span></label>
-            <section class="character-set-picker lobby-character-set-picker">
-              <label><span>Набір характеристик</span>
-                <select id="lobbyCharacterSetMode">
-                  <option value="compact">Стислий — 8 характеристик</option>
-                  <option value="extended">Розширений — усі характеристики</option>
-                  <option value="custom">Власний набір</option>
-                </select>
-              </label>
-              <p id="lobbyCharacterSetHint" class="muted character-set-hint"></p>
-              <div id="lobbyCustomCharacterKeys" class="character-key-grid hidden"></div>
-            </section>
-            <label class="vote-setting-field"><span>Рішення громади</span><select id="lobbyVoteSystem"><option value="exile">Лише вигнання</option><option value="tribunal">Трибунал: 3 санкції</option></select></label>
-            <label class="vote-setting-field"><span>Видимість голосів</span><select id="lobbyVoteVisibility"><option value="secret">Таємні</option><option value="open">Відкриті</option></select></label>
-            <label class="vote-setting-field"><span>Нічия</span><select id="lobbyTieRule"><option value="runoff">Переголосування між лідерами</option><option value="no_action">Одразу без санкцій</option></select></label>
-            <section class="automation-settings-card lobby-automation-settings">
-              <div><span>Ведення партії</span><small>Захист від простою</small></div>
-              <label><span>Режим</span><select id="lobbyAutomationMode"><option value="off">Ручний</option><option value="assist">Допоміжний</option><option value="auto">Автоматичний ведучий</option></select></label>
-              <label><span>Відсутність, с</span><input id="lobbyInactivityTimeoutSeconds" type="number" min="15" max="600" /></label>
-              <label><span>Ліміт фази, с</span><input id="lobbyPhaseTimeoutSeconds" type="number" min="30" max="1800" /></label>
-              <label class="toggle-card compact-toggle"><input id="lobbySettingsHostFailoverEnabled" type="checkbox" /><span><strong>Автоматична заміна хоста</strong><small>Резервний ведучий після тривалої відсутності.</small></span></label>
-              <label><span>Заміна хоста через, с</span><input id="lobbySettingsHostFailoverSeconds" type="number" min="15" max="900" /></label>
-            </section>
-            <label><span>Абсурдність</span><select id="lobbyAbsurdity"><option value="0">0 — серйозно</option><option value="1">1 — трохи дивного</option><option value="2">2 — збалансовано</option><option value="3">3 — багато гумору</option><option value="4">4 — повний хаос</option></select></label>
-          </div>
-          <div id="lobbyModeDescription" class="mode-description"></div>
-          <div id="lobbyVictoryPreview" class="victory-rule-preview"></div>
-          <button id="saveLobbySettings" class="button secondary" type="button">Зберегти налаштування</button>
-        </section>
-      </div>
-    </section>
-
-    <section id="gameScreen" class="screen">
-      <section class="status-grid compact-status-grid" data-game-tab-panel="shelter">
-        <article class="panel danger compact-panel">
-          <p class="eyebrow">Катастрофа</p>
-          <h2 id="catastropheTitle"></h2>
-          <p id="catastropheDescription" class="catastrophe-summary"></p>
-          <span id="catastropheThreat" class="badge accent"></span>
-          <div id="catastropheModules" class="scenario-module-grid"></div>
-          <section id="scenarioPriorities" class="scenario-priorities" aria-labelledby="scenarioPrioritiesTitle">
-            <div class="scenario-priorities-heading">
-              <div><p class="eyebrow">Короткий брифінг</p><h3 id="scenarioPrioritiesTitle">На що звернути увагу</h3></div>
-              <span class="badge">3 · 3 · 2 · 1</span>
-            </div>
-            <div class="scenario-priority-grid">
-              <article class="scenario-priority-column threat-column"><h4>3 головні загрози</h4><div id="scenarioPriorityThreats" class="scenario-priority-list"></div></article>
-              <article class="scenario-priority-column need-column"><h4>3 критичні потреби</h4><div id="scenarioPriorityNeeds" class="scenario-priority-list"></div></article>
-              <article class="scenario-priority-column condition-column"><h4>2 особливі умови</h4><div id="scenarioPriorityConditions" class="scenario-priority-list"></div></article>
-            </div>
-            <article id="scenarioPriorityLongTerm" class="scenario-long-term-risk"></article>
-          </section>
-          <article id="catastropheComplication" class="scenario-complication"></article>
-          <details class="catastrophe-lore" open>
-            <summary>Повний контекст катастрофи</summary>
-            <div class="lore-grid">
-              <article><small>Передумови</small><p id="catastropheCause"></p></article>
-              <article><small>Падіння світу</small><p id="catastropheCollapse"></p></article>
-              <article><small>Поверхня зараз</small><p id="catastropheSurface"></p></article>
-              <article><small>Довгострокова перспектива</small><p id="catastropheHorizon"></p></article>
-            </div>
-          </details>
-        </article>
-        <article class="panel compact-panel">
-          <div class="shelter-heading"><div><p class="eyebrow">Сховище</p><h2 id="shelterTitle"></h2></div><p id="shelterDescription" class="muted"></p></div>
-          <div id="shelterFacts" class="shelter-facts"></div>
-          <details class="shelter-manifest">
-            <summary>План приміщень і стартовий провіант</summary>
-            <div class="shelter-detail-grid">
-              <section><h4>Приміщення</h4><div id="shelterRooms" class="room-list"></div></section>
-              <section><h4>Провіант на старті</h4><div id="shelterProvisions" class="provision-list"></div><p class="manifest-note">Маніфест показує номінальний запас усього комплексу, розрахований на його проєктну місткість. Ресурсні шкали нижче враховують доступність, псування, тиск катастрофи та випадковий стан запасів цієї партії.</p></section>
-            </div>
-          </details>
-          <div id="resources" class="resource-grid"></div>
-          <div id="modules" class="module-grid"></div>
-          <div id="assets" class="assets"></div>
-        </article>
-      </section>
-
-      <section class="phase-bar panel compact-panel">
-        <div class="phase-copy"><p class="eyebrow">Хід партії</p><h3 id="phaseTitle">Раунд 1 · Розкриття</h3><p id="phaseHelp" class="muted"></p><div id="phaseLoopTrack" class="phase-loop-track" aria-label="Цикл поточного режиму"></div></div>
-        <div class="phase-actions">
-          <section id="discussionTimer" class="discussion-timer hidden" aria-label="Таймер обговорення">
-            <div class="timer-face"><small>Час на поточну соціальну фазу</small><strong id="discussionTimerDisplay">05:00</strong></div>
-            <div id="discussionTimerHostControls" class="timer-host-controls hidden">
-              <label><span>Хвилин</span><input id="discussionTimerMinutes" type="number" min="0.25" max="60" step="0.25" value="5" /></label>
-              <button id="discussionTimerSet" class="button ghost timer-button" type="button">Задати</button>
-              <button id="discussionTimerStart" class="button secondary timer-button" type="button">Старт</button>
-              <button id="discussionTimerPause" class="button ghost timer-button" type="button">Пауза</button>
-              <button id="discussionTimerReset" class="button ghost timer-button" type="button">Скинути</button>
-            </div>
-          </section>
-          <span id="phaseBadge" class="badge accent"></span>
-          <button id="hostResolveButton" class="button secondary hidden" type="button"></button>
-          <button id="hostNextButton" class="button primary hidden" type="button">Наступна фаза</button>
-        </div>
-      </section>
-
-      <nav id="gameTabs" class="game-tabs panel compact-panel" aria-label="Розділи поточної партії" role="tablist">
-        <button class="game-tab-button active" type="button" role="tab" aria-selected="true" data-game-tab-button="turn"><span>Хід</span><small id="gameTabTurnStatus">Поточна дія</small></button>
-        <button class="game-tab-button" type="button" role="tab" aria-selected="false" data-game-tab-button="character"><span>Мій персонаж</span><small>Картка й здібності</small></button>
-        <button class="game-tab-button" type="button" role="tab" aria-selected="false" data-game-tab-button="group"><span>Група</span><small>Відкриті дані</small></button>
-        <button class="game-tab-button" type="button" role="tab" aria-selected="false" data-game-tab-button="shelter"><span>Сховище</span><small>Загрози й ресурси</small></button>
-        <button class="game-tab-button" type="button" role="tab" aria-selected="false" data-game-tab-button="log"><span>Журнал</span><small>Події партії</small></button>
-        <button id="investigationTabButton" class="game-tab-button hidden" type="button" role="tab" aria-selected="false" data-game-tab-button="investigation"><span>Розслідування</span><small>Докази й версії</small></button>
-      </nav>
-
-      <section id="hostDashboardPanel" class="panel host-dashboard-panel compact-panel hidden" data-game-tab-panel="turn" role="tabpanel">
-        <div class="section-title compact-title host-dashboard-heading">
-          <div><p class="eyebrow">Панель ведучого</p><h3>Готовність групи</h3><p id="hostDashboardHelp" class="muted"></p></div>
-          <span id="hostDashboardSafety" class="badge"></span>
-        </div>
-        <div id="hostDashboardSummary" class="host-dashboard-summary"></div>
-        <div id="hostDashboardWarnings" class="host-dashboard-warnings"></div>
-        <section id="hostAutomationPanel" class="host-automation-panel">
-          <div class="host-automation-head"><div><strong>Захист від простою</strong><small id="hostAutomationStatus" class="muted"></small></div><span id="hostAutomationCountdown" class="badge"></span></div>
-          <div class="host-automation-controls">
-            <label><span>Режим</span><select id="hostAutomationMode"><option value="off">Ручний</option><option value="assist">Допоміжний</option><option value="auto">Автоматичний ведучий</option></select></label>
-            <label><span>Відсутність, с</span><input id="hostAutomationInactivity" type="number" min="15" max="600" /></label>
-            <label><span>Ліміт фази, с</span><input id="hostAutomationPhase" type="number" min="30" max="1800" /></label>
-            <button id="hostAutomationSave" class="button secondary" type="button">Застосувати</button>
-            <button id="hostResolveInactive" class="button ghost" type="button">Пропустити відсутніх</button>
-            <button id="hostResolveAllPending" class="button ghost" type="button">Нейтрально завершити очікування</button>
-          </div>
-          <p class="muted host-automation-note">Автоматичні дії не використовують приватну інформацію й не роблять стратегічного вибору.</p>
-        </section>
-        <div class="host-dashboard-table-wrap">
-          <table class="host-dashboard-table">
-            <thead><tr><th>Гравець</th><th>Підключення</th><th>Статус</th><th>Поточна фаза</th><th>Публічні дії</th></tr></thead>
-            <tbody id="hostDashboardPlayers"></tbody>
-          </table>
-        </div>
-        <p class="host-dashboard-privacy muted">Панель не показує таємні ролі, зміст голосів або приховані здібності.</p>
-      </section>
-
-      <section id="gameSessionPanel" class="panel session-management-panel compact-panel" data-game-tab-panel="turn" role="tabpanel">
-        <div class="section-title compact-title"><div><p class="eyebrow">Доступ до партії</p><h3>Сеанс і ведучий</h3></div><span id="gameSessionHostBadge" class="badge"></span></div>
-        <div class="session-management-grid">
-          <article class="recovery-code-card"><small>Мій персональний код</small><strong id="gameRecoveryCode">----------</strong><p>Код дозволяє перенести цього персонажа на інший пристрій.</p><div><button id="gameCopyRecoveryCode" class="button ghost" type="button">Копіювати</button><button id="gameRegenerateRecoveryCode" class="button ghost" type="button">Створити новий</button></div></article>
-          <article id="gameHostManagement" class="host-transfer-card hidden"><small>Керування ведучим</small><label><span>Передати права</span><select id="gameHostTransferTarget"></select></label><button id="gameTransferHost" class="button secondary" type="button">Передати права хоста</button><label class="toggle-card compact-toggle"><input id="gameHostFailoverEnabled" type="checkbox" /><span><strong>Автоматична заміна</strong><small>Якщо хост довго не відповідає.</small></span></label><label><span>Через, с</span><input id="gameHostFailoverSeconds" type="number" min="15" max="900" /></label><button id="gameSaveHostFailover" class="button ghost" type="button">Зберегти резервне ведення</button></article>
-        </div>
-        <div id="gameRecoveryRequests" class="recovery-request-list hidden"></div>
-      </section>
-
-      <section id="victoryRulesPanel" class="panel victory-rules-panel compact-panel" data-game-tab-panel="turn" role="tabpanel">
-        <div class="section-title compact-title"><div><p class="eyebrow">Умови цієї партії</p><h3>Три рівні результату</h3></div><span id="victoryModeBadge" class="badge"></span></div>
-        <div id="victoryRulesCards" class="victory-rule-grid"></div>
-        <p id="victoryEndCondition" class="victory-end-condition muted"></p>
-      </section>
-
-      <section id="currentActionPanel" class="panel current-action-panel compact-panel" data-game-tab-panel="turn" role="tabpanel">
-        <div class="current-action-heading">
-          <div><p class="eyebrow">Що робити зараз?</p><h2 id="currentActionTitle">Очікуйте оновлення стану</h2></div>
-          <span id="currentActionBadge" class="badge accent">Поточна фаза</span>
-        </div>
-        <p id="currentActionText" class="current-action-text muted"></p>
-        <div id="currentActionSteps" class="current-action-steps"></div>
-        <button id="currentActionShortcut" class="button primary current-action-shortcut" type="button">Перейти до дії</button>
-      </section>
-
-      <div class="game-grid game-tabbed-content">
-        <div class="game-main-column">
-        <section class="panel private-panel compact-panel" data-game-tab-panel="character" role="tabpanel">
-          <div class="section-title compact-title">
-            <div><p class="eyebrow">Особиста картка</p><h3 id="privateName"></h3></div>
-            <span id="privateStatus" class="badge"></span>
-          </div>
-          <article id="revealStrategyPanel" class="reveal-strategy-panel hidden">
-            <div class="reveal-strategy-head"><div><p class="eyebrow">Стратегічне розкриття</p><h4 id="revealStrategyTitle"></h4></div><span id="revealInfluenceBadge" class="badge accent"></span></div>
-            <p id="revealStrategyReason" class="muted"></p>
-            <div id="revealFocusChips" class="reveal-focus-chips"></div>
-            <div id="revealPersonalDirective" class="reveal-personal-directive"></div>
-            <div id="revealIncomingRequests" class="reveal-incoming-requests"></div>
-          </article>
-          <div id="revealToolbar" class="reveal-toolbar hidden">
-            <span id="revealCounter" class="muted"></span>
-            <button id="revealSelectedButton" class="button secondary" type="button">Відкрити вибрані</button>
-          </div>
-          <div id="privateCharacter" class="character-grid"></div>
-
-          <div class="private-secondary-grid">
-            <article id="roleBox" class="secret-box role-box compact-box">
-              <div class="section-title compact-title"><div><p class="eyebrow">Прихована роль</p><h4 id="roleName"></h4></div><span id="roleFaction" class="badge"></span></div>
-              <p id="roleDescription" class="muted"></p>
-              <p><strong>Умова:</strong> <span id="roleObjective"></span></p>
-              <div id="roleActionControls"></div>
-            </article>
-
-            <article id="medicalBox" class="secret-box compact-box">
-              <div class="section-title compact-title"><div><p class="eyebrow">Стан персонажа</p><h4 id="conditionTitle"></h4></div><span id="conditionBadge" class="badge"></span></div>
-              <p id="conditionText" class="muted"></p>
-              <div id="diseaseMeter" class="disease-meter"><span></span></div>
-              <p id="diseaseDetails" class="medical-details"></p>
-              <div id="privateNotes" class="private-notes"></div>
-            </article>
-
-            <article id="goalBox" class="secret-box compact-box">
-              <p class="eyebrow">Особиста мета</p>
-              <p id="personalGoal"></p>
-            </article>
-
-            <article id="abilityBox" class="ability-box compact-box">
-              <div><p class="eyebrow">Здібність</p><h4 id="abilityName"></h4><p id="abilityDescription" class="muted"></p></div>
-              <div id="abilityControls"></div>
-            </article>
-          </div>
-
-          <article id="interactionBox" class="interaction-box compact-box">
-            <div><p class="eyebrow">Дії поточної фази</p><h4>Взаємодія з групою</h4><p class="muted">Передавання предмета й допомога мають окремі ліміти, тому одна дія більше не блокує іншу.</p></div>
-            <div id="inventoryList" class="inventory-list"></div>
-            <div id="interactionControls"></div>
-          </article>
-        </section>
-
-        <aside id="primaryActionPanel" class="panel action-panel compact-panel" data-game-tab-panel="turn" role="tabpanel">
-          <div id="operationsPanel" class="action-section hidden">
-            <p class="eyebrow">Операції сховища</p>
-            <h3>Експедиція та ремонт</h3>
-            <p class="muted">За раунд можна провести одну експедицію та один плановий ремонт.</p>
-            <div id="operationsControls"></div>
-          </div>
-          <div id="eventPanel" class="action-section hidden">
-            <p class="eyebrow">Криза раунду</p>
-            <h3 id="eventTitle"></h3>
-            <p id="eventDescription" class="muted"></p>
-            <div id="eventChoices" class="choice-list"></div>
-            <p id="eventResult" class="result-box hidden"></p>
-          </div>
-          <div id="votePanel" class="action-section hidden">
-            <p class="eyebrow">Рішення громади</p>
-            <h3 id="votePanelTitle">Оберіть рішення</h3>
-            <p id="votePanelHelp" class="muted"></p>
-            <div id="voteRunoffBanner" class="runoff-banner hidden"></div>
-            <label id="voteSanctionWrap" class="sanction-select"><span>Санкція</span><select id="voteSanction"><option value="exile">Вигнання</option><option value="detention">Ізоляція на раунд</option><option value="silence">Позбавлення голосу</option></select></label>
-            <div id="eliminationChoices" class="choice-list"></div>
-            <div id="publicVoteLedger" class="vote-ledger hidden"></div>
-            <section id="appealReturnBox" class="appeal-return hidden"><h4>Апеляції на повернення</h4><p class="muted">Окремий голос не замінює основне рішення громади.</p><div id="appealChoices" class="choice-list"></div></section>
-          </div>
-          <div id="outsidePanel" class="action-section hidden">
-            <p class="eyebrow">За межами сховища</p>
-            <h3 id="outsideRoleName"></h3>
-            <p id="outsideRoleDescription" class="muted"></p>
-            <div id="outsideControls"></div>
-            <div id="appealControls" class="appeal-controls"></div>
-          </div>
-          <div id="waitingPanel" class="action-section">
-            <p class="eyebrow">Поточна фаза</p>
-            <h3 id="waitingTitle"></h3>
-            <p id="waitingText" class="muted"></p>
-          </div>
-        </aside>
-        <section id="outsideCampBoard" class="panel outside-camp-board compact-panel hidden" data-game-tab-panel="turn" role="tabpanel">
-          <div class="section-title compact-title"><div><p class="eyebrow">Друга громада</p><h3>Зовнішній табір</h3></div><span id="outsideCampStatus" class="badge">Не сформовано</span></div>
-          <div id="outsideCampSummary"></div>
-          <div id="outsideDealBox"></div>
-          <div id="outsideCampHistory" class="outside-camp-history"></div>
-        </section>
-        <section id="judgementProtocolPanel" class="panel judgement-protocol-panel compact-panel hidden" data-game-tab-panel="turn" role="tabpanel">
-          <div class="section-title compact-title"><div><p class="eyebrow">Протокол рішення</p><h3>Як сформувався результат</h3></div><span id="judgementProtocolStatus" class="badge">—</span></div>
-          <p class="muted">Таємне голосування показує лише агреговані підсумки. Поіменні голоси доступні тільки у відкритому режимі.</p>
-          <div id="judgementProtocolBody"></div>
-        </section>
-        </div>
-        <aside class="game-side-rail">
-          <section id="detectivePanel" class="panel detective-panel compact-panel hidden" data-game-tab-panel="investigation" role="tabpanel">
-            <div class="section-title compact-title"><div><p class="eyebrow">Центральна справа</p><h3>Розслідування та версії</h3></div><span class="badge">Детектив</span></div>
-            <article id="detectiveCaseBrief" class="detective-case-brief"></article>
-            <div class="detective-rules-card">
-              <strong>Як перемогти</strong>
-              <p>Група повинна правильно назвати організатора злочину та зібрати потрібну кількість незалежних ланок доказів. Одна підозріла характеристика, чутка або слабке алібі не доводять вини.</p>
-              <p>Організатор і можливий співучасник перемагають, якщо група звинувачує невинного або не збирає достатньо доказів. Приховані слідчі дії не з’являються в загальному журналі.</p>
-            </div>
-            <article id="detectivePrivateRole" class="detective-private-role"></article>
-            <div id="detectiveClues" class="detective-clues"></div>
-            <details class="detective-suspicion-box" open><summary>Публічні версії групи — можуть бути хибними</summary><div id="detectiveSuspicion"></div></details>
-            <div id="detectivePublicClaims" class="detective-public-claims"></div>
-            <div class="detective-investigation-controls">
-              <label><span>Кого перевірити</span><select id="detectiveTarget"></select></label>
-              <label><span>Що перевірити</span><select id="detectiveAspect"><option value="alibi">Алібі</option><option value="motive">Мотив</option><option value="access">Доступ</option><option value="testimony">Свідчення</option><option value="evidenceLink">Речові докази</option></select></label>
-              <button id="detectiveInvestigateButton" class="button secondary full" type="button">Провести приватну перевірку</button>
-              <p id="detectiveInvestigationStatus" class="muted"></p>
-              <div id="detectiveNotebook" class="detective-notebook"></div>
-              <hr class="detective-divider" />
-              <label><span>Фінальне звинувачення</span><select id="detectiveAccusationTarget"></select></label>
-              <button id="detectiveAccusationButton" class="button primary full" type="button">Зафіксувати головного підозрюваного</button>
-              <p id="detectiveAccusationStatus" class="muted"></p>
-            </div>
-          </section>
-          <section class="panel players-panel compact-panel" data-game-tab-panel="group" role="tabpanel">
-          <div class="section-title compact-title"><div><p class="eyebrow">Учасники</p><h3>Відкриті дані</h3></div></div>
-          <article id="revealRequestPanel" class="reveal-request-panel hidden">
-            <div class="reveal-request-summary"><div><p class="eyebrow">Запити громади</p><h4>Попросити відкрити категорію</h4></div><span id="revealRequestInfluence" class="badge"></span></div>
-            <p class="muted">Запит коштує 1 вплив і діє у наступному раунді. Виконання запиту винагороджує відкритість цілі.</p>
-            <div id="revealRequestHistory" class="reveal-request-history"></div>
-            <div id="revealRequestControls" class="reveal-request-controls">
-              <label><span>Гравець</span><select id="revealRequestTarget"></select></label>
-              <label><span>Категорія</span><select id="revealRequestKey"></select></label>
-              <button id="revealRequestButton" class="button secondary" type="button">Створити запит за 1 вплив</button>
-            </div>
-            <p id="revealRequestStatus" class="muted"></p>
-          </article>
-          <div id="publicPlayers" class="public-players"></div>
-          </section>
-
-          <section class="panel log-panel compact-panel" data-game-tab-panel="log" role="tabpanel">
-        <div class="section-title compact-title"><div><p class="eyebrow">Хід партії</p><h3>Журнал</h3></div><span class="badge">Нові записи зверху</span></div>
-        <div class="reason-journal-head"><div><p class="eyebrow">Журнал причин</p><h3>Чому система дала саме такий результат</h3></div><span class="badge">Шанс · чинники · кидок · наслідок</span></div>
-        <div id="reasonJournal" class="reason-journal"></div>
-        <details class="technical-log"><summary>Технічний журнал подій</summary><div id="gameLog" class="log-list"></div></details>
-          </section>
-        </aside>
-      </div>
-    </section>
-
-    <section id="finalScreen" class="screen">
-      <section class="panel final-hero final-hero-v093">
-        <div class="final-hero-copy">
-          <p class="eyebrow">Фінальна симуляція</p>
-          <h2 id="finalVerdict"></h2>
-          <p id="finalDescription" class="lead"></p>
-        </div>
-        <div class="final-score-wrap">
-          <div id="finalScore" class="score-circle"></div>
-          <small>Підсумкова оцінка зі 100</small>
-        </div>
-      </section>
-
-      <section id="finalVictoryPanel" class="panel final-victory-panel">
-        <div class="section-title"><div><p class="eyebrow">Підсумок перемоги</p><h3>Група, персонаж і спеціальна умова</h3></div><span class="badge">Ваш результат</span></div>
-        <div id="finalVictorySummary" class="final-victory-grid"></div>
-      </section>
-
-      <section class="panel final-dashboard">
-        <div class="section-title"><div><p class="eyebrow">Стан громади</p><h3>Ключові показники</h3></div></div>
-        <div id="finalMetrics" class="final-metrics"></div>
-        <div class="score-explainer">
-          <div><p class="eyebrow">Формула фіналу</p><h3>Звідки взялася оцінка</h3></div>
-          <div id="finalScoreBreakdown" class="score-breakdown"></div>
-        </div>
-      </section>
-
-      <section class="panel simulation-timeline-panel">
-        <div class="section-title"><div><p class="eyebrow">Дні, місяці та роки</p><h3>Часові зрізи виживання</h3></div><span id="simulationHorizonBadge" class="badge"></span></div>
-        <div id="simulationTimeSlices" class="simulation-time-slices"></div>
-      </section>
-
-      <div class="simulation-summary-grid">
-        <section class="panel simulation-summary-card"><p class="eyebrow">Розвиток поселення</p><div id="finalSettlementSummary"></div></section>
-        <section class="panel simulation-summary-card"><p class="eyebrow">Демографія</p><div id="finalDemographySummary"></div></section>
-        <section class="panel simulation-summary-card"><p class="eyebrow">Медицина через роки</p><div id="finalMedicalSummary"></div></section>
-      </div>
-
-      <section class="panel simulation-conflicts-panel">
-        <div class="section-title"><div><p class="eyebrow">Особисті суперечності</p><h3>Конфлікти та примирення</h3></div><span id="finalConflictBadge" class="badge"></span></div>
-        <div id="finalConflicts" class="simulation-conflicts"></div>
-      </section>
-
-      <section class="panel simulation-chronicle-panel">
-        <div class="section-title"><div><p class="eyebrow">Наслідки рішень</p><h3>Хроніка після завершення відбору</h3></div></div>
-        <div id="longTermChronicle" class="long-term-chronicle"></div>
-      </section>
-
-      <div class="final-brief-grid">
-        <section class="panel final-brief strengths-panel"><p class="eyebrow">Сильні сторони</p><div id="finalStrengths" class="brief-list"></div></section>
-        <section class="panel final-brief risks-panel"><p class="eyebrow">Основні ризики</p><div id="finalRisks" class="brief-list"></div></section>
-        <section class="panel final-brief priorities-panel"><p class="eyebrow">Перші рішення після фіналу</p><div id="finalPriorities" class="brief-list numbered"></div></section>
-      </div>
-
-      <div class="final-grid final-grid-v093">
-        <section class="panel"><p class="eyebrow">Вижили</p><div id="finalSurvivors" class="survivor-list"></div></section>
-        <section id="finalGoalsSection" class="panel"><p class="eyebrow">Особисті цілі</p><div id="finalGoals" class="goal-list"></div></section>
-        <section id="finalOutsideCampSection" class="panel full-span hidden"><p class="eyebrow">Друга громада</p><div id="finalOutsideCamp"></div></section>
-        <section class="panel full-span"><p class="eyebrow">Аналітичний висновок</p><div id="finalAnalysis" class="analysis-grid"></div></section>
-        <section class="panel full-span"><p class="eyebrow">Доля кожного учасника</p><div id="finalOutcomes" class="outcome-list"></div></section>
-        <section class="panel full-span"><p class="eyebrow">Усі персонажі та характеристики</p><div id="finalCharacters" class="final-characters"></div></section>
-        <section id="finalRolesSection" class="panel full-span"><p class="eyebrow">Розкриття прихованих ролей</p><div id="finalRoles" class="role-results"></div></section>
-        <details class="panel full-span technical-log"><summary>Технічний журнал основної партії</summary><div id="finalChronology" class="timeline"></div></details>
-      </div>
-    </section>
-  </main>
-
-  <div id="roundEventBackdrop" class="round-event-backdrop hidden"></div>
-  <section id="roundEventModal" class="round-event-modal hidden" role="dialog" aria-modal="true" aria-labelledby="roundEventModalTitle">
-    <div class="round-event-head">
-      <div><p class="eyebrow">Криза раунду</p><div id="roundEventSymbol" class="round-event-symbol">◇</div><h2 id="roundEventModalTitle"></h2></div>
-      <button id="roundEventClose" class="button ghost info-close" type="button" aria-label="Закрити подію">×</button>
-    </div>
-    <p id="roundEventModalDescription" class="round-event-description"></p>
-    <div class="event-decision-heading"><h3>Оберіть рішення групи</h3><p>Навички активних персонажів впливають на шанс успіху, але не гарантують результат.</p></div>
-    <div id="roundEventChoices" class="round-event-choices"></div>
-    <p id="roundEventModalResult" class="event-outcome-box hidden"></p>
-    <div id="roundEventReasonReport" class="hidden"></div>
-    <div class="round-event-footer"><span id="roundEventVoteCount" class="badge"></span><button id="roundEventResolve" class="button primary hidden" type="button">Підрахувати голоси</button></div>
+<section class="phase-bar panel compact-panel" data-game-tab-panel="turn" role="tabpanel">
+<div class="phase-copy"><p class="eyebrow">Хід партії</p><h3 id="phaseTitle">Раунд 1 · Розкриття</h3><p class="muted" id="phaseHelp"></p><div aria-label="Цикл поточного режиму" class="phase-loop-track" id="phaseLoopTrack"></div></div>
+<div class="phase-actions">
+<section aria-label="Таймер обговорення" class="discussion-timer hidden" id="discussionTimer">
+<div class="timer-face"><small>Час на поточну соціальну фазу</small><strong id="discussionTimerDisplay">05:00</strong></div>
+<div class="timer-host-controls hidden" id="discussionTimerHostControls">
+<label><span>Хвилин</span><input id="discussionTimerMinutes" max="60" min="0.25" step="0.25" type="number" value="5"/></label>
+<button class="button ghost timer-button" id="discussionTimerSet" type="button">Задати</button>
+<button class="button secondary timer-button" id="discussionTimerStart" type="button">Старт</button>
+<button class="button ghost timer-button" id="discussionTimerPause" type="button">Пауза</button>
+<button class="button ghost timer-button" id="discussionTimerReset" type="button">Скинути</button>
+</div>
+</section>
+<span class="badge accent" id="phaseBadge"></span>
+<button class="button secondary hidden" id="hostResolveButton" type="button"></button>
+<button class="button primary hidden" id="hostNextButton" type="button">Наступна фаза</button>
+</div>
+</section>
+<section aria-live="polite" class="panel tutorial-guide-panel compact-panel hidden" data-game-tab-panel="turn" id="tutorialGuidePanel" role="tabpanel">
+<div class="tutorial-guide-head">
+<div><p class="eyebrow">Навчальна партія</p><h3 id="tutorialGuideTitle">Поточний крок</h3></div>
+<span class="badge accent" id="tutorialGuideStep">1/10</span>
+</div>
+<div class="tutorial-progress"><span id="tutorialGuideProgress"></span></div>
+<p class="tutorial-guide-text" id="tutorialGuideText"></p>
+<div class="tutorial-guide-checklist" id="tutorialGuideChecklist"></div>
+<p class="tutorial-host-note hidden" id="tutorialGuideHostNote"></p>
+<button class="button secondary" id="tutorialGuidePrimary" type="button">Перейти до кроку</button>
+</section>
+<nav aria-label="Розділи поточної партії" class="game-tabs panel compact-panel" id="gameTabs" role="tablist"><button aria-selected="true" class="game-tab-button active" data-game-tab-button="turn" role="tab" type="button"><span>Хід</span><small id="gameTabTurnStatus">Поточне рішення</small></button><button aria-selected="false" class="game-tab-button" data-game-tab-button="character" role="tab" type="button"><span>Персонаж</span><small>Особова справа</small></button><button aria-selected="false" class="game-tab-button" data-game-tab-button="group" role="tab" type="button"><span>Група</span><small>Відкриті дані</small></button><button aria-selected="false" class="game-tab-button" data-game-tab-button="catastrophe" role="tab" type="button"><span>Катастрофа</span><small>Аварійний звіт</small></button><button aria-selected="false" class="game-tab-button" data-game-tab-button="shelter" role="tab" type="button"><span>Сховище</span><small>Системи й запаси</small></button><button aria-selected="false" class="game-tab-button" data-game-tab-button="log" role="tab" type="button"><span>Журнал</span><small>Причини й події</small></button><button aria-selected="false" class="game-tab-button" data-game-tab-button="system" role="tab" type="button"><span>Система</span><small>Хост і діагностика</small></button><button aria-selected="false" class="game-tab-button hidden" data-game-tab-button="investigation" id="investigationTabButton" role="tab" type="button"><span>Слідство</span><small>Докази й версії</small></button></nav>
+<section class="panel system-command-panel hidden" data-game-tab-panel="system" id="systemCommandIntro" role="tabpanel">
+  <div class="system-command-copy">
+    <p class="eyebrow">Командний центр</p>
+    <h2>Стан партії та керування</h2>
+    <p class="muted">Спершу перевірте блокери переходу. Технічні параметри, коди й резервне ведення згорнуті нижче.</p>
+  </div>
+  <span class="system-role-badge" id="systemRoleBadge">Ведучий</span>
+</section>
+<section class="panel host-dashboard-panel compact-panel hidden" data-game-tab-panel="system" id="hostDashboardPanel" role="tabpanel">
+  <div class="section-title compact-title host-dashboard-heading">
+    <div><p class="eyebrow">Стан групи</p><h3>Готовність до переходу</h3><p class="muted" id="hostDashboardHelp"></p></div>
+    <span class="status-indicator" id="hostDashboardSafety"></span>
+  </div>
+  <div class="host-dashboard-summary" id="hostDashboardSummary"></div>
+  <section class="host-blockers-section">
+    <div class="host-subsection-title"><span>Що потребує уваги</span><small>Показано лише блокери й критичні попередження</small></div>
+    <div class="host-dashboard-warnings" id="hostDashboardWarnings"></div>
   </section>
-
-  <div id="infoDrawerBackdrop" class="info-drawer-backdrop hidden"></div>
-  <aside id="infoDrawer" class="info-drawer hidden" aria-live="polite" aria-label="Опис характеристики">
-    <div class="info-drawer-head">
-      <div><p id="infoDrawerLabel" class="eyebrow">Характеристика</p><h3 id="infoDrawerValue">Оберіть характеристику</h3></div>
-      <button id="infoDrawerClose" class="button ghost info-close" type="button" aria-label="Закрити опис">×</button>
+  <section class="host-roster-section">
+    <div class="host-subsection-title"><span>Учасники</span><small>Підключення, готовність і публічні дії</small></div>
+    <div class="host-player-cards" id="hostDashboardRoster"></div>
+    <div class="host-dashboard-table-wrap legacy-host-table" aria-hidden="true">
+      <table class="host-dashboard-table"><tbody id="hostDashboardPlayers"></tbody></table>
     </div>
-    <p id="infoDrawerDescription" class="info-drawer-description">Натисніть «Опис» біля характеристики, щоб прочитати пояснення тут.</p>
-  </aside>
-
-  <div id="toast" class="toast hidden"></div>
-  <script src="app.js?v=1.0.5"></script>
+  </section>
+  <details class="system-details host-automation-details" id="hostAutomationDetails">
+    <summary><span><b>Автоматизація та захист від простою</b><small id="hostAutomationStatus"></small></span><span class="status-indicator" id="hostAutomationCountdown"></span></summary>
+    <section class="host-automation-panel" id="hostAutomationPanel">
+      <div class="host-automation-controls">
+        <label><span>Режим</span><select id="hostAutomationMode"><option value="off">Ручний</option><option value="assist">Допоміжний</option><option value="auto">Автоматичний ведучий</option></select></label>
+        <label><span>Відсутність, с</span><input id="hostAutomationInactivity" max="600" min="15" type="number"/></label>
+        <label><span>Ліміт фази, с</span><input id="hostAutomationPhase" max="1800" min="30" type="number"/></label>
+        <button class="button secondary" id="hostAutomationSave" type="button">Застосувати</button>
+        <button class="button ghost" id="hostResolveInactive" type="button">Пропустити відсутніх</button>
+        <button class="button ghost" id="hostResolveAllPending" type="button">Нейтрально завершити очікування</button>
+      </div>
+      <p class="muted host-automation-note">Автоматичні дії не використовують приватну інформацію й не роблять стратегічного вибору.</p>
+    </section>
+  </details>
+  <p class="host-dashboard-privacy muted">Командний центр не показує таємні ролі, зміст голосів або приховані здібності.</p>
+</section>
+<section class="panel session-management-panel compact-panel" data-game-tab-panel="system" id="gameSessionPanel" role="tabpanel">
+  <div class="section-title compact-title"><div><p class="eyebrow">Доступ</p><h3>Сеанс і відновлення</h3></div><span class="status-indicator" id="gameSessionHostBadge"></span></div>
+  <article class="recovery-code-inline"><div><small>Персональний код</small><strong id="gameRecoveryCode">----------</strong></div><p>Перенесення персонажа на інший пристрій.</p><div><button class="button ghost" id="gameCopyRecoveryCode" type="button">Копіювати</button><button class="button ghost" id="gameRegenerateRecoveryCode" type="button">Оновити</button></div></article>
+  <details class="system-details hidden" id="gameHostManagement">
+    <summary><span><b>Керування ведучим</b><small>Передача прав і резервна заміна</small></span></summary>
+    <div class="host-transfer-card"><label><span>Передати права</span><select id="gameHostTransferTarget"></select></label><button class="button secondary" id="gameTransferHost" type="button">Передати права хоста</button><label class="toggle-card compact-toggle"><input id="gameHostFailoverEnabled" type="checkbox"/><span><strong>Автоматична заміна</strong><small>Якщо хост довго не відповідає.</small></span></label><label><span>Через, с</span><input id="gameHostFailoverSeconds" max="900" min="15" type="number"/></label><button class="button ghost" id="gameSaveHostFailover" type="button">Зберегти резервне ведення</button></div>
+  </details>
+  <div class="recovery-request-list hidden" id="gameRecoveryRequests"></div>
+</section>
+<details class="panel system-details system-diagnostics-panel" data-game-tab-panel="system" id="gameGenerationPanel" role="tabpanel">
+  <summary><span><b>Діагностика й відтворення</b><small>Seed, конфігурація та відбиток роздачі</small></span></summary>
+  <section aria-live="polite" class="generation-panel compact-generation-panel" id="gameGenerationPanelInner">
+    <div><small>Seed</small><strong id="gameGenerationSeedValue">—</strong></div>
+    <div><small>Конфігурація</small><strong id="gameGenerationConfigCode">—</strong></div>
+    <div><small>Відбиток роздачі</small><strong id="gameGenerationFingerprint">—</strong></div>
+    <button class="button ghost" id="gameCopyGenerationBundle" type="button">Копіювати дані</button>
+  </section>
+</details>
+<details class="panel system-details system-rules-panel" data-game-tab-panel="system" id="victoryRulesPanel" role="tabpanel">
+  <summary><span><b>Умови результату</b><small>Груповий, особистий і спеціальний рівні</small></span><span class="status-indicator" id="victoryModeBadge"></span></summary>
+  <div class="victory-rule-grid" id="victoryRulesCards"></div>
+  <p class="victory-end-condition muted" id="victoryEndCondition"></p>
+</details>
+<section class="panel current-action-panel compact-panel" data-game-tab-panel="turn" id="currentActionPanel" role="tabpanel">
+<div class="current-action-heading">
+<div><p class="eyebrow">Що робити зараз?</p><h2 id="currentActionTitle">Очікуйте оновлення стану</h2></div>
+<span class="badge accent" id="currentActionBadge">Поточна фаза</span>
+</div>
+<p class="current-action-text muted" id="currentActionText"></p>
+<div class="current-action-steps" id="currentActionSteps"></div>
+<button class="button primary current-action-shortcut" id="currentActionShortcut" type="button">Перейти до дії</button>
+</section>
+<div class="game-grid game-tabbed-content">
+<div class="game-main-column">
+<section class="panel private-panel compact-panel" data-game-tab-panel="character" role="tabpanel">
+<div class="section-title compact-title">
+<div><p class="eyebrow">Особиста картка</p><h3 id="privateName"></h3></div>
+<span class="badge" id="privateStatus"></span>
+</div>
+<section class="dossier-passport" aria-label="Паспорт особової справи">
+  <div class="dossier-silhouette" aria-hidden="true"><span></span></div>
+  <div><p class="eyebrow">Особова справа</p><strong id="dossierFileNumber">КАНДИДАТ</strong><small>Персональні дані · доступ лише власнику</small></div>
+  <div class="dossier-stamp">ДОПУЩЕНО<br/>ДО ВІДБОРУ</div>
+</section>
+<article class="reveal-strategy-panel hidden" id="revealStrategyPanel">
+<div class="reveal-strategy-head"><div><p class="eyebrow">Стратегічне розкриття</p><h4 id="revealStrategyTitle"></h4></div><span class="badge accent" id="revealInfluenceBadge"></span></div>
+<p class="muted" id="revealStrategyReason"></p>
+<div class="reveal-focus-chips" id="revealFocusChips"></div>
+<div class="reveal-personal-directive" id="revealPersonalDirective"></div>
+<div class="reveal-incoming-requests" id="revealIncomingRequests"></div>
+</article>
+<div class="reveal-toolbar hidden" id="revealToolbar">
+<span class="muted" id="revealCounter"></span>
+<button class="button secondary" id="revealSelectedButton" type="button">Відкрити вибрані</button>
+</div>
+<div class="character-grid" id="privateCharacter"></div>
+<div class="private-secondary-grid">
+<article class="secret-box role-box compact-box" id="roleBox">
+<div class="section-title compact-title"><div><p class="eyebrow">Прихована роль</p><h4 id="roleName"></h4></div><span class="badge" id="roleFaction"></span></div>
+<p class="muted" id="roleDescription"></p>
+<p><strong>Умова:</strong> <span id="roleObjective"></span></p>
+<div id="roleActionControls"></div>
+</article>
+<article class="secret-box compact-box" id="medicalBox">
+<div class="section-title compact-title"><div><p class="eyebrow">Стан персонажа</p><h4 id="conditionTitle"></h4></div><span class="badge" id="conditionBadge"></span></div>
+<p class="muted" id="conditionText"></p>
+<div class="disease-meter" id="diseaseMeter"><span></span></div>
+<p class="medical-details" id="diseaseDetails"></p>
+<div class="private-notes" id="privateNotes"></div>
+</article>
+<article class="secret-box compact-box" id="goalBox">
+<p class="eyebrow">Особиста мета</p>
+<p id="personalGoal"></p>
+</article>
+<article class="ability-box compact-box" id="abilityBox">
+<div><p class="eyebrow">Здібність</p><h4 id="abilityName"></h4><p class="muted" id="abilityDescription"></p></div>
+<div id="abilityControls"></div>
+</article>
+</div>
+<article class="interaction-box compact-box" id="interactionBox">
+<div><p class="eyebrow">Дії поточної фази</p><h4>Взаємодія з групою</h4><p class="muted">Передавання предмета й допомога мають окремі ліміти, тому одна дія більше не блокує іншу.</p></div>
+<div class="inventory-list" id="inventoryList"></div>
+<div id="interactionControls"></div>
+</article>
+</section>
+<aside class="panel action-panel compact-panel" data-game-tab-panel="turn" id="primaryActionPanel" role="tabpanel">
+<div class="action-section hidden" id="operationsPanel">
+<p class="eyebrow">Операції сховища</p>
+<h3>Експедиція та ремонт</h3>
+<p class="muted">За раунд можна провести одну експедицію та один плановий ремонт.</p>
+<div id="operationsControls"></div>
+</div>
+<div class="action-section hidden" id="eventPanel">
+<p class="eyebrow">Криза раунду</p>
+<h3 id="eventTitle"></h3>
+<p class="muted" id="eventDescription"></p>
+<div class="choice-list" id="eventChoices"></div>
+<p class="result-box hidden" id="eventResult"></p>
+</div>
+<div class="action-section hidden" id="votePanel">
+<p class="eyebrow">Рішення громади</p>
+<h3 id="votePanelTitle">Оберіть рішення</h3>
+<p class="muted" id="votePanelHelp"></p>
+<div class="runoff-banner hidden" id="voteRunoffBanner"></div>
+<label class="sanction-select" id="voteSanctionWrap"><span>Санкція</span><select id="voteSanction"><option value="exile">Вигнання</option><option value="detention">Ізоляція на раунд</option><option value="silence">Позбавлення голосу</option></select></label>
+<div class="council-candidate-grid" id="eliminationChoices"></div><div class="council-confirm-bar"><span id="voteConfirmSummary">Оберіть кандидата або варіант без санкцій</span><button class="button primary" id="voteConfirmButton" type="button" disabled>Підтвердити голос</button></div>
+<div class="vote-ledger hidden" id="publicVoteLedger"></div>
+<section class="appeal-return hidden" id="appealReturnBox"><h4>Апеляції на повернення</h4><p class="muted">Окремий голос не замінює основне рішення громади.</p><div class="choice-list" id="appealChoices"></div></section>
+</div>
+<div class="action-section hidden" id="outsidePanel">
+<p class="eyebrow">За межами сховища</p>
+<h3 id="outsideRoleName"></h3>
+<p class="muted" id="outsideRoleDescription"></p>
+<div id="outsideControls"></div>
+<div class="appeal-controls" id="appealControls"></div>
+</div>
+<div class="action-section" id="waitingPanel">
+<p class="eyebrow">Поточна фаза</p>
+<h3 id="waitingTitle"></h3>
+<p class="muted" id="waitingText"></p>
+</div>
+</aside>
+<section class="panel outside-camp-board compact-panel hidden" data-game-tab-panel="turn" id="outsideCampBoard" role="tabpanel">
+<div class="section-title compact-title"><div><p class="eyebrow">Друга громада</p><h3>Зовнішній табір</h3></div><span class="badge" id="outsideCampStatus">Не сформовано</span></div>
+<div id="outsideCampSummary"></div>
+<div id="outsideDealBox"></div>
+<div class="outside-camp-history" id="outsideCampHistory"></div>
+</section>
+<section class="panel judgement-protocol-panel compact-panel hidden" data-game-tab-panel="turn" id="judgementProtocolPanel" role="tabpanel">
+<div class="section-title compact-title"><div><p class="eyebrow">Протокол рішення</p><h3>Як сформувався результат</h3></div><span class="badge" id="judgementProtocolStatus">—</span></div>
+<p class="muted">Таємне голосування показує лише агреговані підсумки. Поіменні голоси доступні тільки у відкритому режимі.</p>
+<div id="judgementProtocolBody"></div>
+</section>
+</div>
+<aside class="game-side-rail">
+<section class="panel detective-panel compact-panel hidden" data-game-tab-panel="investigation" id="detectivePanel" role="tabpanel">
+<div class="section-title compact-title"><div><p class="eyebrow">Центральна справа</p><h3>Розслідування та версії</h3></div><span class="badge">Детектив</span></div>
+<article class="detective-case-brief" id="detectiveCaseBrief"></article>
+<div class="detective-rules-card">
+<strong>Як перемогти</strong>
+<p>Група повинна правильно назвати організатора злочину та зібрати потрібну кількість незалежних ланок доказів. Одна підозріла характеристика, чутка або слабке алібі не доводять вини.</p>
+<p>Організатор і можливий співучасник перемагають, якщо група звинувачує невинного або не збирає достатньо доказів. Приховані слідчі дії не з’являються в загальному журналі.</p>
+</div>
+<article class="detective-private-role" id="detectivePrivateRole"></article>
+<div class="detective-clues" id="detectiveClues"></div>
+<details class="detective-suspicion-box" open=""><summary>Публічні версії групи — можуть бути хибними</summary><div id="detectiveSuspicion"></div></details>
+<div class="detective-public-claims" id="detectivePublicClaims"></div>
+<div class="detective-investigation-controls">
+<label><span>Кого перевірити</span><select id="detectiveTarget"></select></label>
+<label><span>Що перевірити</span><select id="detectiveAspect"><option value="alibi">Алібі</option><option value="motive">Мотив</option><option value="access">Доступ</option><option value="testimony">Свідчення</option><option value="evidenceLink">Речові докази</option></select></label>
+<button class="button secondary full" id="detectiveInvestigateButton" type="button">Провести приватну перевірку</button>
+<p class="muted" id="detectiveInvestigationStatus"></p>
+<div class="detective-notebook" id="detectiveNotebook"></div>
+<hr class="detective-divider"/>
+<label><span>Фінальне звинувачення</span><select id="detectiveAccusationTarget"></select></label>
+<button class="button primary full" id="detectiveAccusationButton" type="button">Зафіксувати головного підозрюваного</button>
+<p class="muted" id="detectiveAccusationStatus"></p>
+</div>
+</section>
+<section class="panel players-panel compact-panel" data-game-tab-panel="group" role="tabpanel">
+<div class="section-title compact-title"><div><p class="eyebrow">Учасники</p><h3>Відкриті дані</h3></div></div>
+<article class="reveal-request-panel hidden" id="revealRequestPanel">
+<div class="reveal-request-summary"><div><p class="eyebrow">Запити громади</p><h4>Попросити відкрити категорію</h4></div><span class="badge" id="revealRequestInfluence"></span></div>
+<p class="muted">Запит коштує 1 вплив і діє у наступному раунді. Виконання запиту винагороджує відкритість цілі.</p>
+<div class="reveal-request-history" id="revealRequestHistory"></div>
+<div class="reveal-request-controls" id="revealRequestControls">
+<label><span>Гравець</span><select id="revealRequestTarget"></select></label>
+<label><span>Категорія</span><select id="revealRequestKey"></select></label>
+<button class="button secondary" id="revealRequestButton" type="button">Створити запит за 1 вплив</button>
+</div>
+<p class="muted" id="revealRequestStatus"></p>
+</article>
+<div class="public-players" id="publicPlayers"></div>
+</section>
+<section class="panel log-panel compact-panel" data-game-tab-panel="log" role="tabpanel">
+<div class="section-title compact-title"><div><p class="eyebrow">Хід партії</p><h3>Журнал</h3></div><span class="badge">Нові записи зверху</span></div>
+<div class="reason-journal-head"><div><p class="eyebrow">Журнал причин</p><h3>Чому система дала саме такий результат</h3></div><span class="badge">Шанс · чинники · кидок · наслідок</span></div>
+<div class="reason-journal" id="reasonJournal"></div>
+<section class="round-summary-card"><p class="eyebrow">Короткий підсумок раунду</p><div id="roundSummary"></div></section>
+<details class="technical-log" open><summary>Повний журнал подій</summary><div class="log-filter-bar"><button class="active" data-log-filter="key" type="button">Ключові</button><button data-log-filter="votes" type="button">Голосування</button><button data-log-filter="resources" type="button">Ресурси</button><button data-log-filter="characters" type="button">Персонажі</button><button data-log-filter="secrets" type="button">Таємниці</button><button data-log-filter="system" type="button">Системні</button><button data-log-filter="all" type="button">Усі</button></div><div class="log-list" id="gameLog"></div></details>
+</section>
+</aside>
+</div>
+</section>
+<section class="screen" id="finalScreen">
+<section class="panel final-hero final-hero-v093">
+<div class="final-hero-copy">
+<p class="eyebrow">Фінальна симуляція</p>
+<h2 id="finalVerdict"></h2>
+<p class="lead" id="finalDescription"></p>
+</div>
+<div class="final-score-wrap">
+<div class="score-circle" id="finalScore"></div>
+<small>Підсумкова оцінка зі 100</small>
+</div>
+</section>
+<section class="panel final-tutorial-panel hidden" id="finalTutorialPanel">
+<div><p class="eyebrow">Навчальна партія завершена</p><h3>Ви пройшли базовий цикл гри</h3></div>
+<p>Картка персонажа, стратегічне розкриття, обговорення, криза, пояснення шансів, голосування громади та фінальний результат уже знайомі. Наступну кімнату можна створювати без навчального режиму.</p>
+<div class="final-tutorial-lessons"><span>Картка</span><span>Розкриття</span><span>Криза</span><span>Протокол</span><span>Фінал</span></div>
+</section>
+<section class="panel final-victory-panel" id="finalVictoryPanel">
+<div class="section-title"><div><p class="eyebrow">Підсумок перемоги</p><h3>Група, персонаж і спеціальна умова</h3></div><span class="badge">Ваш результат</span></div>
+<div class="final-victory-grid" id="finalVictorySummary"></div>
+</section>
+<section class="panel final-dashboard">
+<div class="section-title"><div><p class="eyebrow">Стан громади</p><h3>Ключові показники</h3></div></div>
+<div class="final-metrics" id="finalMetrics"></div>
+<div class="final-score-layers" id="finalScoreLayers"></div>
+<div class="score-explainer">
+<div><p class="eyebrow">Формула фіналу</p><h3>Звідки взялася оцінка</h3></div>
+<div class="score-breakdown" id="finalScoreBreakdown"></div>
+</div>
+</section>
+<section class="panel final-causality-panel">
+<div class="section-title"><div><p class="eyebrow">Причина й прогноз</p><h3>Що вирішили гравці, а що лише припустила модель</h3></div><span class="badge">Рішення мають основну вагу</span></div>
+<div class="final-causality-grid">
+<div><h4>Прямі наслідки рішень</h4><p class="muted">Факти з роздачі, голосувань, лікування, операцій, ресурсів і складу групи.</p><div class="causality-list" id="finalDirectConsequences"></div></div>
+<div><h4>Симуляційні припущення</h4><p class="muted">Один можливий прогноз майбутнього. Його вплив на оцінку обмежено дванадцятьма балами.</p><div class="causality-list" id="finalSimulationAssumptions"></div></div>
+</div>
+</section>
+<section class="panel simulation-timeline-panel">
+<div class="section-title"><div><p class="eyebrow">Дні, місяці та роки</p><h3>Часові зрізи виживання</h3></div><span class="badge" id="simulationHorizonBadge"></span></div>
+<div class="simulation-time-slices" id="simulationTimeSlices"></div>
+</section>
+<div class="simulation-summary-grid">
+<section class="panel simulation-summary-card"><p class="eyebrow">Розвиток поселення</p><div id="finalSettlementSummary"></div></section>
+<section class="panel simulation-summary-card"><p class="eyebrow">Демографія</p><div id="finalDemographySummary"></div></section>
+<section class="panel simulation-summary-card"><p class="eyebrow">Медицина через роки</p><div id="finalMedicalSummary"></div></section>
+</div>
+<section class="panel simulation-conflicts-panel">
+<div class="section-title"><div><p class="eyebrow">Особисті суперечності</p><h3>Конфлікти та примирення</h3></div><span class="badge" id="finalConflictBadge"></span></div>
+<div class="simulation-conflicts" id="finalConflicts"></div>
+</section>
+<section class="panel simulation-chronicle-panel">
+<div class="section-title"><div><p class="eyebrow">Партія та можливе майбутнє</p><h3>Повна хроніка рішень і прогнозованих подій</h3></div></div>
+<div class="long-term-chronicle" id="longTermChronicle"></div>
+</section>
+<div class="final-brief-grid">
+<section class="panel final-brief strengths-panel"><p class="eyebrow">Сильні сторони</p><div class="brief-list" id="finalStrengths"></div></section>
+<section class="panel final-brief risks-panel"><p class="eyebrow">Основні ризики</p><div class="brief-list" id="finalRisks"></div></section>
+<section class="panel final-brief priorities-panel"><p class="eyebrow">Перші рішення після фіналу</p><div class="brief-list numbered" id="finalPriorities"></div></section>
+</div>
+<div class="final-grid final-grid-v093">
+<section class="panel"><p class="eyebrow">Вижили</p><div class="survivor-list" id="finalSurvivors"></div></section>
+<section class="panel" id="finalGoalsSection"><p class="eyebrow">Особисті цілі</p><div class="goal-list" id="finalGoals"></div></section>
+<section class="panel full-span hidden" id="finalOutsideCampSection"><p class="eyebrow">Друга громада</p><div id="finalOutsideCamp"></div></section>
+<section class="panel full-span"><p class="eyebrow">Аналітичний висновок</p><div class="analysis-grid" id="finalAnalysis"></div></section>
+<section class="panel full-span"><p class="eyebrow">Доля кожного учасника</p><div class="outcome-list" id="finalOutcomes"></div></section>
+<section class="panel full-span"><p class="eyebrow">Усі персонажі та характеристики</p><div class="final-characters" id="finalCharacters"></div></section>
+<section class="panel full-span" id="finalRolesSection"><p class="eyebrow">Розкриття прихованих ролей</p><div class="role-results" id="finalRoles"></div></section>
+<details class="panel full-span technical-log"><summary>Технічний журнал основної партії</summary><div class="timeline" id="finalChronology"></div></details>
+</div>
+</section>
+</main>
+<div class="round-event-backdrop hidden" id="roundEventBackdrop"></div>
+<section aria-labelledby="roundEventModalTitle" aria-modal="true" class="round-event-modal hidden" id="roundEventModal" role="dialog">
+<div class="round-event-head">
+<div><p class="eyebrow">Криза раунду</p><div class="round-event-symbol" id="roundEventSymbol">◇</div><h2 id="roundEventModalTitle"></h2></div>
+<button aria-label="Закрити подію" class="button ghost info-close" id="roundEventClose" type="button">×</button>
+</div>
+<p class="round-event-description" id="roundEventModalDescription"></p>
+<div class="event-decision-heading"><h3>Оберіть рішення групи</h3><p>Навички активних персонажів впливають на шанс успіху, але не гарантують результат.</p></div>
+<div class="round-event-choices" id="roundEventChoices"></div>
+<p class="event-outcome-box hidden" id="roundEventModalResult"></p>
+<div class="hidden" id="roundEventReasonReport"></div>
+<div class="round-event-footer"><span class="badge" id="roundEventVoteCount"></span><div class="round-event-footer-actions"><button class="button primary hidden" id="roundEventConfirm" type="button">Підтвердити рішення</button><button class="button primary hidden" id="roundEventResolve" type="button">Підрахувати голоси</button></div></div>
+</section>
+<div class="info-drawer-backdrop hidden" id="infoDrawerBackdrop"></div>
+<aside aria-label="Опис характеристики" aria-live="polite" class="info-drawer hidden" id="infoDrawer">
+<div class="info-drawer-head">
+<div><p class="eyebrow" id="infoDrawerLabel">Характеристика</p><h3 id="infoDrawerValue">Оберіть характеристику</h3></div>
+<button aria-label="Закрити опис" class="button ghost info-close" id="infoDrawerClose" type="button">×</button>
+</div>
+<p class="info-drawer-description" id="infoDrawerDescription">Натисніть «Опис» біля характеристики, щоб прочитати пояснення тут.</p>
+</aside>
+<div class="toast hidden" id="toast"></div>
+<script src="app.js?stage7-v=ui6-stage6-council"></script>
 </body>
 </html>

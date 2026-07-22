@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { stopChildProcess } = require("./test_support");
 
 const root = __dirname;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "bunker-medical-dilemmas-"));
@@ -31,9 +32,7 @@ function start() {
   return ready();
 }
 async function stop() {
-  if (!child || child.killed) return;
-  await new Promise((resolve) => { child.once("exit", resolve); child.kill("SIGTERM"); setTimeout(resolve, 1600); });
-  child = null;
+  await stopChildProcess(child);
 }
 async function action(code, session, actionName, extra = {}, expectError = false) {
   return api(`/api/rooms/${code}/action`, "POST", { playerId: session.playerId, token: session.token, action: actionName, ...extra }, expectError);
@@ -62,10 +61,10 @@ async function state(code, session) {
   await action(host.code, host, "start");
   await stop();
 
-  const saveFile = path.join(dataDir, "rooms_v105.json");
-  const rooms = JSON.parse(fs.readFileSync(saveFile, "utf8"));
-  const room = rooms.find((item) => item.code === host.code);
-  assert(room && room.game, "saved room missing");
+  const saveFile = path.join(dataDir, "rooms-v6", `${host.code}.json`);
+  const savedEnvelope = JSON.parse(fs.readFileSync(saveFile, "utf8"));
+  const room = savedEnvelope.room;
+  assert(room?.game, "saved room missing");
   room.game.phase = "operations";
   room.game.shelter.resources.medicine = 70;
   room.game.shelter.resources.morale = 70;
@@ -89,7 +88,7 @@ async function state(code, session) {
   patient.character.injury = 1;
   patient.character.stress = 1;
   patient.character.medicalIsolationUntilRound = null;
-  fs.writeFileSync(saveFile, JSON.stringify(rooms, null, 2));
+  fs.writeFileSync(saveFile, JSON.stringify({ ...savedEnvelope, savedAt: Date.now(), room }, null, 2));
 
   await start();
   let hostState = await state(host.code, host);
@@ -142,7 +141,7 @@ async function state(code, session) {
 
   await stop();
   fs.rmSync(dataDir, { recursive: true, force: true });
-  console.log("1.1.9: медичні тактики, нагляд, карантин, дефіцитні витрати й ризиковане втручання перевірені.");
+  console.log("1.2.10: медичні тактики, нагляд, карантин, дефіцитні витрати й ризиковане втручання перевірені.");
 })().catch(async (error) => {
   console.error(error);
   await stop();

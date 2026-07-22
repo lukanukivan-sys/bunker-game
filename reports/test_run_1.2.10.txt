@@ -1,0 +1,186 @@
+
+> skhovyshche-online@1.2.10 test
+> node run_all_tests.js
+
+
+[1/35] test_ability_balance_129.js
+1.2.10: 105 здібностей мають профілі за 7 параметрами; гарантовані успіхи прибрано, голосувальні здібності мають ціну.
+✅ test_ability_balance_129.js завершено за 0.1 с
+
+[2/35] test_access_code_limits_123a.js
+✅ Access code length and recovery-form hotfix tests passed
+✅ test_access_code_limits_123a.js завершено за 0.4 с
+
+[3/35] test_advanced_modules_111.js
+1.2.10: модульний розширений режим перевірено.
+✅ test_advanced_modules_111.js завершено за 1.0 с
+
+[4/35] test_api_v1.js
+Повний локальний HTTP-цикл 1.2.10 перевірено: профіль, кампанія, набір, партія, фінал і відновлення після перезапуску.
+✅ test_api_v1.js завершено за 0.7 с
+
+[5/35] test_balance_v1.js
+Баланс 1.2.10 перевірено для 7 сетингів: щонайменше 40% без активної хвороби, унікальні ролі й здібності, до 6 експедицій, ресурси 0–100.
+✅ test_balance_v1.js завершено за 0.9 с
+
+[6/35] test_campaign_legacy_126.js
+Кампанійна спадщина 1.2.10 перевірена: обмежені бонуси, шлях відновлення, голосування, ціна переваги й закриття дилеми.
+✅ test_campaign_legacy_126.js завершено за 0.4 с
+
+[7/35] test_character_sets_106.js
+Набори характеристик перевірено: стислий, розширений, власний і детективний.
+✅ test_character_sets_106.js завершено за 0.3 с
+
+[8/35] test_configuration_validator_112.js
+Валідатор конфігурації, прогноз тривалості та серверне блокування перевірено.
+✅ test_configuration_validator_112.js завершено за 0.3 с
+
+[9/35] test_content_pack_analyzer_128.js
+✅ Stage 22 author-content analyzer tests passed
+✅ test_content_pack_analyzer_128.js завершено за 0.3 с
+
+[10/35] test_demographic_context_115.js
+Демографічний блок, повне вимкнення та довгострокове моделювання перевірено.
+✅ test_demographic_context_115.js завершено за 0.3 с
+
+[11/35] test_demography_102.js
+1.2.10: початкова вагітність, планована народжуваність і пояснення демографії працюють.
+✅ test_demography_102.js завершено за 0.0 с
+
+[12/35] test_detective_105.js
+1.2.10: конкретна справа, нейтральні досьє, приватні перевірки, приховані здібності та відсутність витоку в журнал перевірені.
+✅ test_detective_105.js завершено за 0.3 с
+
+[13/35] test_detective_final_105.js
+1.2.10: повний детективний фінал перевірено; доказова сила 3/2, solved=true.
+✅ test_detective_final_105.js завершено за 0.4 с
+
+[14/35] test_final_balance_129.js
+✅ Stage 24 final balance tests passed: mode scoring, causality split, ±12 simulation cap, 3–12 players, 105 abilities audited.
+✅ test_final_balance_129.js завершено за 0.1 с
+
+[15/35] test_final_simulation.js
+Фінальну симуляцію 1.2.10 перевірено успішно для 7 сетингів.
+✅ test_final_simulation.js завершено за 0.0 с
+
+[16/35] test_game_tabs_107.js
+1.2.10: чотири вкладки, єдиний огляд, динамічна поточна дія, клавіатурна навігація та мобільна адаптація перевірені.
+✅ test_game_tabs_107.js завершено за 0.0 с
+
+[17/35] test_host_dashboard_108.js
+1.2.10: панель хоста, приватність, готовність фаз і попередження переходу перевірені.
+✅ test_host_dashboard_108.js завершено за 0.3 с
+
+[18/35] test_host_recovery_122.js
+✅ Stage 17 host transfer and recovery tests passed
+✅ test_host_recovery_122.js завершено за 1.5 с
+
+[19/35] test_inactive_automation_121.js
+1.2.10: допоміжний режим, нейтральний бот і автоматичне просування фаз перевірені.
+✅ test_inactive_automation_121.js завершено за 6.7 с
+
+[20/35] test_logic_103.js
+1.2.10: сумісність здібностей із режимом, прості сімейні статуси, двосторонні взаємини, компактне сховище й безпліддя перевірено.
+✅ test_logic_103.js завершено за 0.3 с
+
+[21/35] test_medical_dilemmas_119.js
+1.2.10: медичні тактики, нагляд, карантин, дефіцитні витрати й ризиковане втручання перевірені.
+✅ test_medical_dilemmas_119.js завершено за 0.4 с
+
+[22/35] test_mode_loops_110.js
+1.2.10: окремі цикли режимів, доступність дій і детективне розслідування перевірені.
+✅ test_mode_loops_110.js завершено за 0.4 с
+
+[23/35] test_network_load_123.js
+✅ Stage 18 network/load tests passed (12 clients, 260 ms wake-up)
+✅ test_network_load_123.js завершено за 2.8 с
+
+[24/35] test_outside_camp_120.js
+1.2.10: зовнішній табір, ресурси, угоди, дії та окремий фінал перевірені.
+✅ test_outside_camp_120.js завершено за 0.4 с
+
+[25/35] test_platform_v1.js
+Платформні системи 1.2.10 перевірено: профілі, кампанії, набори, статистика й повторне завантаження.
+✅ test_platform_v1.js завершено за 0.4 с
+
+[26/35] test_reason_explanations_117.js
+1.2.10: якісні прев’ю, точні післядійні звіти та журнал причин перевірені.
+✅ test_reason_explanations_117.js завершено за 0.3 с
+
+[27/35] test_reproducible_seed_124.js
+✅ Stage 19 reproducible seed tests passed
+✅ test_reproducible_seed_124.js завершено за 0.4 с
+
+[28/35] test_scenario_priorities_113.js
+Пріоритети сценарію 3/3/2/1, детективний брифінг і безпечне розкриття обставини перевірено.
+✅ test_scenario_priorities_113.js завершено за 0.5 с
+
+[29/35] test_setting_expansion_127.js
+✅ Stage 23 setting expansion and full-chaos tests passed
+✅ test_setting_expansion_127.js завершено за 0.3 с
+
+[30/35] test_strategic_reveals_114.js
+Стратегічне розкриття, вплив, запити громади та наслідки приховування перевірено.
+✅ test_strategic_reveals_114.js завершено за 0.4 с
+
+[31/35] test_team_operations_118.js
+1.2.10: командні ролі, експедиція на трьох і ремонтна бригада перевірені.
+✅ test_team_operations_118.js завершено за 0.3 с
+
+[32/35] test_transparent_tribunal_116.js
+1.2.10: протокол трибуналу, таємність і переголосування між лідерами перевірені.
+✅ test_transparent_tribunal_116.js завершено за 0.4 с
+
+[33/35] test_tutorial_mode_125.js
+✅ Stage 20 tutorial mode tests passed
+✅ test_tutorial_mode_125.js завершено за 0.4 с
+
+[34/35] test_ui_logic_102.js
+1.2.10: місткість, баланс ресурсів, конкретні описи, таймер і метадані подій перевірено.
+✅ test_ui_logic_102.js завершено за 0.3 с
+
+[35/35] test_victory_conditions_109.js
+1.2.10: групові, особисті та спеціальні умови перемоги перевірено для всіх режимів і детективу.
+✅ test_victory_conditions_109.js завершено за 1.0 с
+
+=== ПІДСУМОК ТЕСТІВ ===
+✅ test_ability_balance_129.js (0.1 с)
+✅ test_access_code_limits_123a.js (0.4 с)
+✅ test_advanced_modules_111.js (1.0 с)
+✅ test_api_v1.js (0.7 с)
+✅ test_balance_v1.js (0.9 с)
+✅ test_campaign_legacy_126.js (0.4 с)
+✅ test_character_sets_106.js (0.3 с)
+✅ test_configuration_validator_112.js (0.3 с)
+✅ test_content_pack_analyzer_128.js (0.3 с)
+✅ test_demographic_context_115.js (0.3 с)
+✅ test_demography_102.js (0.0 с)
+✅ test_detective_105.js (0.3 с)
+✅ test_detective_final_105.js (0.4 с)
+✅ test_final_balance_129.js (0.1 с)
+✅ test_final_simulation.js (0.0 с)
+✅ test_game_tabs_107.js (0.0 с)
+✅ test_host_dashboard_108.js (0.3 с)
+✅ test_host_recovery_122.js (1.5 с)
+✅ test_inactive_automation_121.js (6.7 с)
+✅ test_logic_103.js (0.3 с)
+✅ test_medical_dilemmas_119.js (0.4 с)
+✅ test_mode_loops_110.js (0.4 с)
+✅ test_network_load_123.js (2.8 с)
+✅ test_outside_camp_120.js (0.4 с)
+✅ test_platform_v1.js (0.4 с)
+✅ test_reason_explanations_117.js (0.3 с)
+✅ test_reproducible_seed_124.js (0.4 с)
+✅ test_scenario_priorities_113.js (0.5 с)
+✅ test_setting_expansion_127.js (0.3 с)
+✅ test_strategic_reveals_114.js (0.4 с)
+✅ test_team_operations_118.js (0.3 с)
+✅ test_transparent_tribunal_116.js (0.4 с)
+✅ test_tutorial_mode_125.js (0.4 с)
+✅ test_ui_logic_102.js (0.3 с)
+✅ test_victory_conditions_109.js (1.0 с)
+
+Пройдено: 35/35
+
+elapsed_seconds=23.38
+exit_code=0

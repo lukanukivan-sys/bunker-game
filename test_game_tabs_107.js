@@ -7,7 +7,7 @@ const html = fs.readFileSync(path.join(root, "public", "index.html"), "utf8");
 const css = fs.readFileSync(path.join(root, "public", "styles.css"), "utf8");
 const app = fs.readFileSync(path.join(root, "public", "app.js"), "utf8");
 
-for (const tab of ["turn", "character", "group", "shelter", "log", "investigation"]) {
+for (const tab of ["turn", "character", "group", "catastrophe", "shelter", "log", "system", "investigation"]) {
   assert(html.includes(`data-game-tab-button="${tab}"`), `Немає кнопки вкладки ${tab}`);
   assert(html.includes(`data-game-tab-panel="${tab}"`), `Немає панелі вкладки ${tab}`);
 }
@@ -22,7 +22,8 @@ assert(app.includes('game.phase === "discussion"'), "Немає підказки
 assert(app.includes('game.phase === "event"'), "Немає підказки для події");
 assert(app.includes('game.phase === "elimination"'), "Немає підказки для голосування");
 assert(app.includes('game.phase === "round_end"'), "Немає підказки для завершення раунду");
+assert(css.includes("body.ui5-command"), "Немає нового командного макета");
+assert(css.includes("grid-template-columns:220px minmax(0,1fr)"), "Немає бічної навігації");
 assert(css.includes(".game-tab-hidden"), "Немає приховування неактивних вкладок");
-assert(css.includes(".current-action-panel"), "Немає стилів поточної дії");
-assert(css.includes("@media (max-width: 650px)"), "Немає мобільної адаптації вкладок");
-console.log("1.0.7: вкладки гри, динамічна поточна дія, клавіатурна навігація та мобільна адаптація перевірені.");
+assert(css.includes("@media(max-width:700px)"), "Немає мобільної адаптації нового макета");
+console.log("1.2.10 UI5: окремі робочі екрани, бічна навігація, поточна дія та мобільний режим перевірені.");

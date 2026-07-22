@@ -1,0 +1,10 @@
+const fs = require('fs');
+const assert = require('assert');
+const html = fs.readFileSync('public/index.html', 'utf8');
+const js = fs.readFileSync('public/app.js', 'utf8');
+assert(html.includes('id="gameTabTurnStatus"'), 'gameTabTurnStatus must exist in navigation');
+assert(html.includes('class="technical-log" open'), 'journal details should be open by default');
+assert(js.includes('if (turnStatus) turnStatus.textContent'), 'turn status update must be null-safe');
+assert(html.includes('data-log-filter="key"'));
+assert(html.includes('id="gameLog"'));
+console.log('✅ UI6 journal regression checks passed');

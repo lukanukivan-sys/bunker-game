@@ -1,5 +1,7 @@
 "use strict";
 
+const { random } = require("../lib/random");
+
 const SEVERITY_LEVELS = [
   { level: 0, name: "Немає активної хвороби", short: "Здоровий стан", operationPenalty: 0, progression: 0, mortality: 0 },
   { level: 1, name: "Легка", short: "Легкий перебіг", operationPenalty: 0.04, progression: 0.13, mortality: 0.01 },
@@ -467,13 +469,13 @@ function getRandomCondition(severity) {
   const all = getAllConditions();
   const filtered = severity !== undefined ? all.filter(cond => cond.severity === severity) : all;
   if (!filtered.length) return null;
-  return filtered[Math.floor(Math.random() * filtered.length)];
+  return filtered[Math.floor(random() * filtered.length)];
 }
 
 function getRandomConditionByType(type) {
   const filtered = getConditionsByType(type);
   if (!filtered.length) return null;
-  return filtered[Math.floor(Math.random() * filtered.length)];
+  return filtered[Math.floor(random() * filtered.length)];
 }
 
 function getTreatmentEffectiveness(condition, treatmentType) {

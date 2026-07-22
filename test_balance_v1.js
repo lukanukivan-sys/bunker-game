@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { stopChildProcess } = require("./test_support");
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "shelter-balance-"));
 const port = 32700 + Math.floor(Math.random() * 400);
@@ -16,8 +17,10 @@ async function api(route, method = "GET", body = null) {
   if (!response.ok || !payload.ok) throw new Error(payload.error || `HTTP ${response.status}`);
   return payload;
 }
-async function ready() { for (let i = 0; i < 50; i += 1) { try { if ((await api("/api/health")).version === "1.0.5") return; } catch {} await new Promise((r) => setTimeout(r, 100)); } throw new Error("Сервер не запустився."); }
-async function stop() { if (!child) return; child.kill("SIGTERM"); await new Promise((resolve) => { child.once("exit", resolve); setTimeout(resolve, 1600); }); }
+async function ready() { for (let i = 0; i < 50; i += 1) { try { if ((await api("/api/health")).version === "1.2.10") return; } catch {} await new Promise((r) => setTimeout(r, 100)); } throw new Error("Сервер не запустився."); }
+async function stop() {
+  await stopChildProcess(child);
+}
 async function action(code, session, actionName, extra = {}) { return api(`/api/rooms/${code}/action`, "POST", { playerId: session.playerId, token: session.token, action: actionName, ...extra }); }
 async function state(code, session) { return api(`/api/rooms/${code}/state?playerId=${session.playerId}&token=${session.token}`); }
 
@@ -25,7 +28,7 @@ async function state(code, session) { return api(`/api/rooms/${code}/state?playe
   start(); await ready();
   const settings = ["modern", "fantasy", "space", "postapocalypse", "cyberpunk", "horror", "detective"];
   for (const setting of settings) {
-    const host = await api("/api/rooms/create", "POST", { name: `${setting}-1`, mode: "advanced", setting, scenarioMode: "procedural", capacity: 6, rounds: 2, revealsPerRound: 2, absurdity: 2 });
+    const host = await api("/api/rooms/create", "POST", { name: `${setting}-1`, mode: "advanced", advancedModules: ["roles"], setting, scenarioMode: "procedural", capacity: 6, rounds: 2, revealsPerRound: 2, absurdity: 2 });
     const sessions = [host];
     for (let index = 2; index <= 12; index += 1) {
       const joined = await api("/api/rooms/join", "POST", { code: host.code, name: `${setting}-${index}` });
@@ -45,5 +48,5 @@ async function state(code, session) { return api(`/api/rooms/${code}/state?playe
     for (const value of Object.values(hostState.game.shelter.resources)) assert(value >= 0 && value <= 100, `${setting}: ресурс поза межами`);
   }
   await stop(); fs.rmSync(dataDir, { recursive: true, force: true });
-  console.log("Баланс 1.0.5 перевірено для 7 сетингів: щонайменше 40% без активної хвороби, унікальні ролі й здібності, до 6 експедицій, ресурси 0–100.");
+  console.log("Баланс 1.2.10 перевірено для 7 сетингів: щонайменше 40% без активної хвороби, унікальні ролі й здібності, до 6 експедицій, ресурси 0–100.");
 })().catch(async (error) => { console.error(error); await stop(); fs.rmSync(dataDir, { recursive: true, force: true }); process.exit(1); });

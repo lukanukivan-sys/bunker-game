@@ -685,12 +685,25 @@ function simulateLongTerm(room, initialScore = 50) {
 
   const avgResources = RESOURCE_KEYS.reduce((sum, key) => sum + state.resources[key], 0) / RESOURCE_KEYS.length;
   const avgModules = moduleAverage(state.modules);
+  const startResourceAverage = RESOURCE_KEYS.reduce((sum, key) => sum + Number(game.shelter.resources?.[key] || 0), 0) / RESOURCE_KEYS.length;
+  const startModuleAverage = moduleAverage(game.shelter.modules || []);
   const startPopulation = active.length + Number(game.shelter.allies || 0);
   const retainedAdultsAndAllies = state.people.filter((item) => item.alive && item.inside && (item.originalPlayer || item.status === "outsider")).length + Number(game.shelter.allies || 0);
   const retention = startPopulation ? clamp(retainedAdultsAndAllies / startPopulation, 0, 1.8) : 0;
-  const conflictPenalty = state.unresolvedConflicts * 4;
-  const deathPenalty = state.deaths * 5;
-  const finalScore = clamp(round(initialScore * 0.25 + avgResources * 0.24 + avgModules * 0.18 + state.settlementLevel * 8 + retention * 12 - conflictPenalty - deathPenalty), 0, 100);
+
+  // Етап 24: майбутнє більше не переоцінює всю партію заново. Воно лише
+  // помірно коригує режимозалежну оцінку рішень у межах ±12 балів.
+  const assumptionComponents = [
+    { id: "resources", label: "Довгострокова динаміка запасів", value: clamp((avgResources - startResourceAverage) * 0.06, -4, 4) },
+    { id: "modules", label: "Зношення та розвиток систем", value: clamp((avgModules - startModuleAverage) * 0.05, -3, 3) },
+    { id: "settlement", label: "Розвиток поселення", value: clamp(state.settlementLevel * 1.15 - 0.6, -1, 4) },
+    { id: "population", label: "Зміна населення", value: clamp((retention - 0.9) * 5, -3, 3) },
+    { id: "conflicts", label: "Майбутні конфлікти", value: -Math.min(3, state.unresolvedConflicts * 1.5) },
+    { id: "mortality", label: "Випадкові смерті та хвороби", value: -Math.min(4, state.deaths * 0.8) }
+  ];
+  const rawAssumptionImpact = assumptionComponents.reduce((sum, item) => sum + item.value, 0);
+  const assumptionImpact = clamp(round(rawAssumptionImpact), -12, 12);
+  const finalScore = clamp(round(initialScore + assumptionImpact), 0, 100);
   const finalVerdict = verdictFor(finalScore, state.population, state.settlementLevel, horizonYears, demographyModeled);
   const personalFateList = personalFates(room, state, horizonYears);
   const medicalSummary = {
@@ -730,13 +743,56 @@ function simulateLongTerm(room, initialScore = 50) {
     moduleAverage: round(avgModules),
     developmentPoints: round(state.developmentPoints)
   };
+  const simulationAssumptions = [
+    {
+      category: "Ресурси",
+      title: avgResources >= startResourceAverage ? "Модель припускає стабілізацію запасів" : "Модель припускає поступове виснаження запасів",
+      text: `Середній рівень змінився з ${round(startResourceAverage)}% до ${round(avgResources)}%. Це прогноз моделі, а не подія, що вже сталася.`,
+      impact: avgResources >= startResourceAverage ? "positive" : "negative",
+      scoreImpact: round(assumptionComponents.find((item) => item.id === "resources").value)
+    },
+    {
+      category: "Системи",
+      title: avgModules >= startModuleAverage ? "Системи можуть витримати довгий горизонт" : "Зношення може випередити ремонт",
+      text: `Прогнозований середній стан модулів: ${round(startModuleAverage)}% → ${round(avgModules)}%.`,
+      impact: avgModules >= startModuleAverage ? "positive" : "negative",
+      scoreImpact: round(assumptionComponents.find((item) => item.id === "modules").value)
+    },
+    {
+      category: "Демографія",
+      title: demographyModeled ? "Змодельовано народження, приєднання та смерті" : "Демографічний прогноз обмежено",
+      text: demographyModeled
+        ? `Модель припустила ${state.births} народжень, ${state.outsidersJoined} приєднань і ${state.deaths} смертей.`
+        : `Часовий горизонт або правила кімнати не дають підстав моделювати нове покоління; враховано лише можливі втрати й приєднання.`,
+      impact: state.population >= startPopulation ? "positive" : "negative",
+      scoreImpact: round(assumptionComponents.find((item) => item.id === "population").value + assumptionComponents.find((item) => item.id === "mortality").value)
+    },
+    {
+      category: "Суспільство",
+      title: state.unresolvedConflicts ? "Частина майбутніх конфліктів могла залишитися невирішеною" : "Модель не прогнозує тривалого внутрішнього розколу",
+      text: `За ${horizonYears} років змодельовано ${conflicts.length} помітних конфліктів; невирішених — ${state.unresolvedConflicts}.`,
+      impact: state.unresolvedConflicts ? "negative" : "positive",
+      scoreImpact: round(assumptionComponents.find((item) => item.id === "conflicts").value)
+    },
+    {
+      category: "Розвиток",
+      title: `Можливий етап: ${settlement.stage}`,
+      text: `Це один детермінований прогноз із наявних умов, а не гарантоване майбутнє. Збудованих об’єктів у сценарії: ${settlement.buildings.length}.`,
+      impact: settlement.level >= 2 ? "positive" : "neutral",
+      scoreImpact: round(assumptionComponents.find((item) => item.id === "settlement").value)
+    }
+  ];
   addChronicle(chronicle, `Рік ${horizonYears}`, "Підсумок", finalVerdict.verdict, `${finalVerdict.description} Населення: ${state.population};${demographyModeled ? ` народжень: ${state.births};` : ""} смертей: ${state.deaths}; етап поселення — ${settlement.stage}.`, finalScore >= 65 ? "good" : finalScore >= 40 ? "warn" : "bad");
 
   return {
     horizonYears,
     initialScore,
     finalScore,
-    scoreAdjustment: finalScore - initialScore,
+    scoreAdjustment: assumptionImpact,
+    assumptionImpact,
+    assumptionCap: 12,
+    assumptionComponents: assumptionComponents.map((item) => ({ ...item, value: round(item.value) })),
+    simulationAssumptions,
     verdict: finalVerdict.verdict,
     description: finalVerdict.description,
     timeSlices,

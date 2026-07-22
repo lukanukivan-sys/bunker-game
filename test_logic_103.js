@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { stopChildProcess, testServerEnv } = require("./test_support");
 const MEDICAL = require("./content/medical");
 const { describeCharacteristic } = require("./content/character_descriptions");
 
@@ -16,7 +17,7 @@ const forbiddenClassicAbilities = new Set([
   "teleport", "portal", "invisibility", "scrying", "hyperspace", "warp_drive", "scanner", "android"
 ]);
 function start() {
-  child = spawn(process.execPath, ["server.js"], { cwd: __dirname, env: { ...process.env, DATA_DIR: dataDir, PORT: String(port), HOST: "127.0.0.1" }, stdio: ["ignore", "ignore", "pipe"] });
+  child = spawn(process.execPath, ["server.js"], { cwd: __dirname, env: testServerEnv({ DATA_DIR: dataDir, PORT: String(port), HOST: "127.0.0.1" }), stdio: ["ignore", "ignore", "pipe"] });
   child.stderr.on("data", (chunk) => process.stderr.write(chunk));
 }
 async function api(route, method = "GET", body = null) {
@@ -27,15 +28,13 @@ async function api(route, method = "GET", body = null) {
 }
 async function ready() {
   for (let i = 0; i < 50; i += 1) {
-    try { if ((await api("/api/health")).version === "1.0.5") return; } catch {}
+    try { if ((await api("/api/health")).version === "1.2.10") return; } catch {}
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw new Error("Сервер 1.0.5 не запустився.");
+  throw new Error("Сервер 1.2.10 не запустився.");
 }
 async function stop() {
-  if (!child) return;
-  child.kill("SIGTERM");
-  await new Promise((resolve) => { child.once("exit", resolve); setTimeout(resolve, 1500); });
+  await stopChildProcess(child);
 }
 async function action(code, session, name, extra = {}) {
   return api(`/api/rooms/${code}/action`, "POST", { playerId: session.playerId, token: session.token, action: name, ...extra });
@@ -48,7 +47,8 @@ async function state(code, session) {
   assert.equal(MEDICAL.buildMedicalCondition("Безпліддя").type, "Репродуктивний стан");
   assert.equal(MEDICAL.buildMedicalCondition("Безпліддя").severity, 0);
   assert(describeCharacteristic("profession", "Спелеолог").includes("підзем"));
-  assert(describeCharacteristic("demographicContext", "Ідентичність: Жіноча • Жінка · Ставлення до батьківства: Чайлдфрі").includes("не дає бонусу або штрафу"));
+  assert(describeCharacteristic("demographicContext", "Жіноча • Жінка").includes("не дає автоматичного бонусу"));
+  assert(describeCharacteristic("attitudeToChildren", "Чайлдфрі").includes("демографічні рішення громади"));
 
   start(); await ready();
   const host = await api("/api/rooms/create", "POST", { name: "Іван", mode: "classic", setting: "modern", scenarioMode: "procedural", capacity: 4, rounds: 2, revealsPerRound: 2, absurdity: 2 });
@@ -65,7 +65,7 @@ async function state(code, session) {
   for (const snapshot of states) {
     const card = snapshot.self.privateCharacter;
     assert(!forbiddenClassicAbilities.has(card.ability.id), `У класичному режимі випала експедиційна здібність ${card.ability.id}`);
-    assert(allowedFamily.some((value) => String(card.values.demographicContext || "").includes(value)), `Надто складний демографічний блок: ${card.values.demographicContext}`);
+    assert(allowedFamily.some((value) => String(card.values.attitudeToChildren || "").includes(value)), `Надто складне ставлення до дітей: ${card.values.attitudeToChildren}`);
     assert(!card.goal.includes("експедиці") && !card.goal.includes("відремонтувати"), `Несумісна ціль: ${card.goal}`);
   }
   const byName = new Map(states.map((snapshot) => [snapshot.self.name, snapshot]));
@@ -87,7 +87,7 @@ async function state(code, session) {
 
   await stop();
   fs.rmSync(dataDir, { recursive: true, force: true });
-  console.log("1.0.5: сумісність здібностей із режимом, прості сімейні статуси, двосторонні взаємини, компактне сховище й безпліддя перевірено.");
+  console.log("1.2.10: сумісність здібностей із режимом, прості сімейні статуси, двосторонні взаємини, компактне сховище й безпліддя перевірено.");
 })().catch(async (error) => {
   console.error(error);
   await stop();

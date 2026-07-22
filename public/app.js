@@ -9,7 +9,7 @@ const MODE_INFO = {
   advanced: { name: "Розширена гра", description: "Модульний режим: базовий відбір доповнюється максимум двома системами, які змінюють цикл і доступні дії.", elimination: true, loop: ["Розкриття", "Обговорення", "Криза", "Рішення", "Наслідки"] }
 };
 const ADVANCED_MODULE_LIMIT = 2;
-const DEFAULT_ADVANCED_MODULES = ["operations", "roles"];
+const DEFAULT_ADVANCED_MODULES = ["operations"];
 const ADVANCED_MODULE_INFO = {
   operations: { name: "Експедиції та ремонт", description: "Окрема фаза операцій, експедиції та плановий ремонт." },
   medicine: { name: "Медицина", description: "Лікування, медичні витрати та догляд під час операцій." },
@@ -94,7 +94,7 @@ function renderVictoryPreview(scope = "create") {
 
 function clientCharacterKeysForSetting(settingId, demographicsEnabled = true) {
   if (settingId === "detective") return DETECTIVE_CHARACTER_KEYS;
-  return demographicsEnabled === false ? BASE_CHARACTER_KEYS.filter((key) => key !== "demographicContext") : BASE_CHARACTER_KEYS;
+  return demographicsEnabled === false ? BASE_CHARACTER_KEYS.filter((key) => !["demographicContext", "attitudeToChildren"].includes(key)) : BASE_CHARACTER_KEYS;
 }
 function normalizedClientCharacterSet(mode, customKeys, settingId, demographicsEnabled = true) {
   const available = clientCharacterKeysForSetting(settingId, demographicsEnabled);
@@ -144,6 +144,7 @@ function renderCharacterSetPicker(scope = "create", preserveSelection = true) {
 }
 function roundToFive(value) { return Math.max(5, Math.round(Number(value || 0) / 5) * 5); }
 function estimateConfigurationDuration(settings, playerCount) {
+  if (settings.tutorialEnabled === true) return { min: 20, max: 35, label: "Навчальна", text: "20–35 хв" };
   const players = Math.max(4, Math.min(12, Number(playerCount || 4)));
   const rounds = Math.max(2, Math.min(7, Number(settings.rounds || 4)));
   const loop = modeLoopPreview(settings.mode, settings.advancedModules, settings.setting);
@@ -169,21 +170,33 @@ function estimateConfigurationDuration(settings, playerCount) {
 }
 function analyzeClientConfiguration(settings, playerCount) {
   const players = Math.max(1, Math.min(12, Number(playerCount || 1)));
+  if (settings.tutorialEnabled === true) {
+    const issues = [];
+    if (players < 3) issues.push({ severity: "error", title: "Замало гравців", text: "Для навчальної партії потрібно щонайменше 3 учасники.", code: "players_min" });
+    else issues.push({ severity: "success", title: "Навчальний сценарій готовий", text: "2 раунди, стислий набір, одна характеристика за раунд, відкриті голоси та безпечний перший раунд без санкцій.", code: "tutorial_ready" });
+    return {
+      playerCount: players, issues, blocking: issues.filter((item) => item.severity === "error").length, warnings: 0,
+      duration: { min: 20, max: 35, label: "Навчальна", text: "20–35 хв" }, characterCount: 8, maxRevealed: 2, revealCoverage: 25,
+      selection: { capacity: Math.max(2, players - 1), exilesNeeded: Math.max(0, players - Math.max(2, players - 1)) },
+      recommendations: { rounds: 2, revealsPerRound: 1 }
+    };
+  }
   const mode = MODE_INFO[settings.mode] || MODE_INFO.classic;
   const advancedModules = normalizeClientAdvancedModules(settings.advancedModules, settings.mode, settings.setting);
   const set = normalizedClientCharacterSet(settings.characterSetMode, settings.customCharacterKeys, settings.setting, settings.demographicsEnabled !== false);
   const rounds = Math.max(2, Math.min(7, Number(settings.rounds || 4)));
   const reveals = Math.max(1, Math.min(4, Number(settings.revealsPerRound || 2)));
-  const capacity = Math.max(2, Math.min(10, Number(settings.capacity || 3)));
+  const capacity = Math.max(settings.soloTestMode === true ? 1 : 2, Math.min(10, Number(settings.capacity || 3)));
   const maxRevealed = Math.min(set.keys.length, rounds * reveals);
   const coverage = set.keys.length ? Math.round((maxRevealed / set.keys.length) * 100) : 0;
   const fullRevealRound = Math.ceil(set.keys.length / reveals);
   const hiddenRoles = settings.setting === "detective" || settings.mode === "factions" || (settings.mode === "advanced" && advancedModules.includes("roles"));
   const issues = [];
   const add = (severity, title, text, code) => issues.push({ severity, title, text, code });
-  if (players < 4) add("error", "Замало гравців", "Для старту потрібно щонайменше 4 учасники.", "players_min");
+  if (settings.soloTestMode === true) add("info", "Соло-тестування", "Режим розробника дозволяє запуск кімнати з одним гравцем.", "solo_test");
+  else if (players < 4) add("error", "Замало гравців", "Для старту потрібно щонайменше 4 учасники.", "players_min");
   const exilesNeeded = mode.elimination ? Math.max(0, players - capacity) : 0;
-  if (mode.elimination && capacity >= players) add("error", "Місткість не створює відбору", `Місць (${capacity}) має бути менше, ніж гравців (${players}).`, "capacity");
+  if (mode.elimination && capacity >= players && settings.soloTestMode !== true) add("error", "Місткість не створює відбору", `Місць (${capacity}) має бути менше, ніж гравців (${players}).`, "capacity");
   if (mode.elimination && exilesNeeded > rounds) add("warning", settings.mode === "classic" ? "Відбір не встигне досягти місткості" : "Фінальна група може лишитися переповненою", `Для місткості ${capacity} потрібно ${exilesNeeded} вигнань, а раундів лише ${rounds}. Партія завершиться за лімітом раундів, навіть якщо активних людей буде більше.`, "selection_pressure");
   else if (mode.elimination && exilesNeeded === rounds && exilesNeeded > 0) add("warning", "Немає запасу на нічию", "Щоб досягти місткості, у кожному раунді має відбутися результативне вигнання.", "selection_margin");
   if (coverage < 50) add("warning", "Більшість картки залишиться прихованою", `За партію можна відкрити лише ${maxRevealed} із ${set.keys.length} характеристик (${coverage}%).`, "reveal_low");
@@ -219,6 +232,7 @@ function settingIsDetective(scope = "create") {
 function configurationSettingsFromControls(scope = "create") {
   const prefix = scope === "lobby" ? "lobby" : "";
   return {
+    tutorialEnabled: Boolean($(prefix ? "lobbyTutorialEnabled" : "tutorialEnabled")?.checked),
     mode: $(prefix ? "lobbyGameMode" : "gameMode")?.value || "classic",
     setting: $(prefix ? "lobbySetting" : "setting")?.value || "modern",
     advancedModules: selectedAdvancedModules(prefix),
@@ -253,14 +267,14 @@ function renderConfigurationAnalysis(scope = "create", provided = null) {
   target.innerHTML = `<div class="configuration-metrics">${metrics.map(([label, value, note]) => `<article><small>${escapeHtml(label)}</small><strong>${escapeHtml(value)}</strong><span>${escapeHtml(note)}</span></article>`).join("")}</div><div class="configuration-issues">${analysis.issues.map((item) => `<article class="configuration-issue ${escapeHtml(item.severity)}"><b>${item.severity === "error" ? "!" : item.severity === "warning" ? "△" : item.severity === "success" ? "✓" : "i"}</b><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.text)}</p></div></article>`).join("")}</div>`;
 }
 const KEY_LABELS = {
-  origin: "Походження / вид", demographicContext: "Демографічні обставини",
+  origin: "Походження / вид", demographicContext: "Стать та ідентичність", attitudeToChildren: "Ставлення до дітей",
   anomaly: "Аномалія", age: "Вік", profession: "Професія", health: "Здоров’я",
   skill: "Навичка", trait: "Риса", item: "Початковий багаж", hobby: "Хобі",
   phobia: "Фобія", secret: "Таємниця", relationship: "Стосунок",
   alibi: "Алібі", motive: "Можливий мотив", access: "Доступ і можливість",
   testimony: "Свідчення", evidenceLink: "Зв’язок із доказами"
 };
-const BASE_CHARACTER_KEYS = ["origin", "demographicContext", "anomaly", "age", "profession", "health", "skill", "trait", "item", "hobby", "phobia", "secret", "relationship"];
+const BASE_CHARACTER_KEYS = ["origin", "demographicContext", "attitudeToChildren", "anomaly", "age", "profession", "health", "skill", "trait", "item", "hobby", "phobia", "secret", "relationship"];
 const DETECTIVE_CHARACTER_KEYS = ["origin", "age", "profession", "health", "skill", "trait", "item", "relationship", "alibi", "motive", "access", "testimony", "evidenceLink", "secret"];
 const COMPACT_CHARACTER_KEYS = ["profession", "health", "skill", "trait", "item", "phobia", "secret", "relationship"];
 const DETECTIVE_COMPACT_CHARACTER_KEYS = ["profession", "health", "skill", "trait", "item", "alibi", "testimony", "secret"];
@@ -275,7 +289,7 @@ const PHASES = {
   negotiation: ["Переговори", "Домовляйтеся, формуйте союзи, обмінюйтеся інформацією та предметами."],
   intrigue: ["Інтриги", "Використайте приховані рольові дії та підготуйтеся до рішення громади."],
   investigation: ["Розслідування", "Проведіть приватну перевірку, зіставте докази та обговоріть версії."],
-  event: ["Криза", "Оберіть спільне рішення поточної загрози. Голоси активних гравців приховані."],
+  event: ["Криза", "Обговоріть варіанти поточної загрози та зафіксуйте рішення за правилами режиму."],
   elimination: ["Рішення громади", "Застосуйте санкцію, підтримайте апеляцію або зафіксуйте формальне звинувачення."],
   round_end: ["Наслідки", "Хост завершує раунд. Система застосує витрати й запустить наступний цикл або фінал."],
   final: ["Фінал", "Партію завершено."]
@@ -304,12 +318,22 @@ let controlsLockedUntil = 0;
 let deferredRenderTimer = null;
 let discussionTicker = null;
 let lastEventModalId = null;
+let pendingEventChoiceId = null;
+let pendingJudgementChoice = null;
 const expandedEliminatedPlayers = new Set();
 let activeGameTab = localStorage.getItem("shelter100-game-tab") || "turn";
+let activeLogFilter = "key";
 let currentActionModel = null;
 let platformData = { account: null, campaigns: [], packs: [], statistics: null };
 function readAccountSession() {
-  try { return JSON.parse(localStorage.getItem("shelter100-account") || "null"); } catch { return null; }
+  try {
+    const raw = sessionStorage.getItem("shelter129-account") || localStorage.getItem("shelter100-account");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    sessionStorage.setItem("shelter129-account", JSON.stringify(parsed));
+    localStorage.removeItem("shelter100-account");
+    return parsed;
+  } catch { return null; }
 }
 function accountCredentials() {
   const value = readAccountSession();
@@ -324,10 +348,8 @@ function refreshPlatformSelects() {
   ["contentPackSelect", "lobbyContentPack"].forEach((id) => { if ($(id)) $(id).innerHTML = packOptions; });
 }
 async function loadPlatform() {
-  const account = readAccountSession();
-  const query = account ? `?accountId=${encodeURIComponent(account.accountId)}&token=${encodeURIComponent(account.token)}` : "";
   try {
-    platformData = await api(`/api/platform/bootstrap${query}`);
+    platformData = await api("/api/platform/bootstrap");
     $("accountBadge").textContent = platformData.account ? `Профіль: ${platformData.account.displayName}` : "Гостьовий режим";
     if (platformData.account) {
       $("createName").value = platformData.account.displayName;
@@ -345,8 +367,10 @@ function showScreen(id) {
 }
 function selectGameTab(tab, options = {}) {
   const hasInvestigation = Boolean(state?.game?.mystery);
-  const allowed = new Set(["turn", "character", "group", "shelter", "log", ...(hasInvestigation ? ["investigation"] : [])]);
-  const nextTab = allowed.has(tab) ? tab : "turn";
+  const aliases = { overview: "group" };
+  const requestedTab = aliases[tab] || tab;
+  const allowed = new Set(["turn", "character", "group", "catastrophe", "shelter", "log", "system", ...(hasInvestigation ? ["investigation"] : [])]);
+  const nextTab = allowed.has(requestedTab) ? requestedTab : "turn";
   activeGameTab = nextTab;
   try { localStorage.setItem("shelter100-game-tab", nextTab); } catch {}
   document.querySelectorAll("[data-game-tab-button]").forEach((button) => {
@@ -424,10 +448,13 @@ function getCurrentActionModel() {
     return { title: PHASES[game.phase]?.[0] || "Соціальна фаза", text: phaseText[game.phase] || PHASES[game.phase]?.[1], badge: PHASES[game.phase]?.[0] || "Фаза", tone: "", targetTab: game.phase === "investigation" ? "investigation" : "group", button: game.phase === "investigation" ? "Відкрити розслідування" : "Переглянути групу", required: false, steps: [{ label: "Обговорити ситуацію", state: "optional" }, ...(game.phase === "intrigue" && game.features?.hiddenRoles ? [{ label: "Таємна рольова дія", state: privateData.roleActionUsed ? "done" : "optional" }] : [])] };
   }
   if (game.phase === "event" && game.event) {
-    if (game.event.resolved) return { title: "Перегляньте наслідок кризи", text: game.event.resultText || "Голосування завершено.", badge: "Кризу вирішено", tone: "done", targetTab: "turn", button: "Відкрити результат", required: false, steps: [{ label: "Наслідок застосовано", state: "done" }] };
-    if (cannotVote) return { title: "Очікуйте рішення групи", text: "Ваш персонаж не може голосувати в цій фазі.", badge: "Без голосу", tone: "waiting", targetTab: "turn", button: "Переглянути кризу", required: false, steps: [{ label: "Голосування недоступне", state: "waiting" }] };
+    if (game.event.resolved) return { title: "Перегляньте наслідок кризи", text: game.event.resultText || "Рішення застосовано.", badge: "Кризу вирішено", tone: "done", targetTab: "turn", button: "Відкрити результат", required: false, steps: [{ label: "Наслідок застосовано", state: "done" }] };
+    const hostDecision = game.event.decisionPolicy === "host";
+    const canDecide = Boolean(game.event.canVote);
+    if (hostDecision && !canDecide) return { title: "Обговоріть рішення кризи", text: "Висловіть аргументи групі. Після обговорення остаточний варіант підтвердить хост.", badge: "Рішення хоста", tone: "waiting", targetTab: "turn", button: "Переглянути кризу", required: false, steps: [{ label: "Обговорити варіанти", state: "optional" }, { label: "Рішення хоста", state: "waiting" }] };
+    if (!canDecide || (!hostDecision && cannotVote)) return { title: "Очікуйте рішення групи", text: "Ваш персонаж не бере участі в цьому колективному голосуванні.", badge: "Без голосу", tone: "waiting", targetTab: "turn", button: "Переглянути кризу", required: false, steps: [{ label: "Голосування недоступне", state: "waiting" }] };
     const voted = Boolean(game.eventVote);
-    return { title: voted ? "Ваш голос враховано" : "Проголосуйте за рішення кризи", text: voted ? "До підрахунку можна змінити вибір." : "Оцініть ризик кожного варіанта й оберіть один.", badge: voted ? "Голос подано" : "Обов’язкова дія", tone: voted ? "done" : "warning", targetTab: "turn", button: "Відкрити кризу", required: !voted, steps: [{ label: "Подати голос", state: voted ? "done" : "pending" }] };
+    return { title: voted ? (hostDecision ? "Рішення кризи обрано" : "Ваш голос враховано") : (hostDecision ? "Оберіть рішення кризи як хост" : "Проголосуйте за рішення кризи"), text: voted ? "До підрахунку можна змінити вибір." : (hostDecision ? "Врахуйте обговорення групи, оцініть ризики та підтвердьте один варіант." : "Оцініть ризик кожного варіанта й оберіть один."), badge: voted ? (hostDecision ? "Рішення обрано" : "Голос подано") : "Обов’язкова дія", tone: voted ? "done" : "warning", targetTab: "turn", button: "Відкрити кризу", required: !voted, steps: [{ label: hostDecision ? "Підтвердити рішення" : "Подати голос", state: voted ? "done" : "pending" }] };
   }
   if (game.phase === "elimination") {
     const runoff = Boolean(game.judgement?.runoff?.active);
@@ -494,6 +521,21 @@ function renderHostDashboard() {
       <td><div class="host-chip-list">${actions}</div></td>
     </tr>`;
   }).join("");
+  const roster = $("hostDashboardRoster");
+  if (roster) roster.innerHTML = (dashboard.players || []).map((player) => {
+    const phaseCode = escapeHtml(player.phaseState?.code || "optional");
+    const phaseLabel = escapeHtml(player.phaseState?.label || "—");
+    const detail = escapeHtml(player.phaseState?.detail || "");
+    const connectionLabel = player.connected ? "У мережі" : `Офлайн · ${Number(player.secondsSinceSeen || 0)} с`;
+    const actions = (player.publicActions || []).length ? player.publicActions.map((item) => `<span class="host-action-chip">${escapeHtml(item)}</span>`).join("") : '<span class="muted">Публічних дій немає</span>';
+    return `<article class="host-player-card ${phaseCode}">
+      <div class="host-player-identity"><span class="host-presence-dot ${player.connected ? "online" : "offline"}"></span><div><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(connectionLabel)}</small></div>${player.isHost ? '<span class="role-tag">Хост</span>' : ''}</div>
+      <div class="host-player-readiness"><span class="host-phase-state ${phaseCode}">${phaseLabel}</span>${detail ? `<small>${detail}</small>` : ""}</div>
+      <div class="host-player-public">${actions}</div>
+    </article>`;
+  }).join("");
+  const roleBadge = $("systemRoleBadge");
+  if (roleBadge) roleBadge.textContent = state.self?.isHost ? "Ви ведучий" : "Учасник";
 }
 function confirmHostAdvance() {
   const dashboard = state?.game?.hostDashboard;
@@ -529,11 +571,14 @@ function renderGameTabs() {
   const hasInvestigation = Boolean(state?.game?.mystery);
   $("investigationTabButton").classList.toggle("hidden", !hasInvestigation);
   if (!hasInvestigation && activeGameTab === "investigation") activeGameTab = "turn";
+  if (!["turn","character","group","catastrophe","shelter","log","system","investigation"].includes(activeGameTab)) activeGameTab = "turn";
   document.querySelectorAll("[data-game-tab-button]").forEach((button) => {
-    const requiresAction = Boolean(currentActionModel?.required && currentActionModel.targetTab === button.dataset.gameTabButton);
+    const targetTab = ({ group: "overview", shelter: "overview", log: "overview" })[currentActionModel?.targetTab] || currentActionModel?.targetTab;
+    const requiresAction = Boolean(currentActionModel?.required && targetTab === button.dataset.gameTabButton);
     button.classList.toggle("action-required", requiresAction);
   });
-  $("gameTabTurnStatus").textContent = currentActionModel?.required ? "Потрібна дія" : currentActionModel?.badge || "Поточна дія";
+  const turnStatus = $("gameTabTurnStatus");
+  if (turnStatus) turnStatus.textContent = currentActionModel?.required ? "Потрібна дія" : currentActionModel?.badge || "Поточна дія";
   selectGameTab(activeGameTab);
 }
 function escapeHtml(value) {
@@ -607,6 +652,11 @@ function eventImpactLabel(keys = []) {
 function chanceBadgeHtml(label, tone = "neutral") {
   return `<span class="chance-badge ${escapeHtml(tone)}">${escapeHtml(label || "Невизначений ризик")}</span>`;
 }
+function contentLevelBadgeHtml(level) {
+  if (level === "absurd") return '<span class="content-level-badge absurd">Повний хаос</span>';
+  if (level === "odd") return '<span class="content-level-badge odd">Дивина</span>';
+  return "";
+}
 function reasonReportHtml(report, compact = false) {
   if (!report) return "";
   const chance = report.chance || {};
@@ -648,21 +698,44 @@ function renderRoundEventModal(game) {
     return;
   }
   const event = game.event;
-  $("roundEventModalTitle").textContent = event.title;
+  $("roundEventModalTitle").innerHTML = `${escapeHtml(event.title)} ${contentLevelBadgeHtml(event.level)}`;
   $("roundEventModalDescription").textContent = event.description;
   $("roundEventSymbol").textContent = state.settings.setting === "fantasy" ? "✦" : state.settings.setting === "space" ? "◈" : state.settings.setting === "horror" ? "◉" : state.settings.setting === "detective" ? "⌕" : "◇";
-  const cannotVote = !state.self.active || state.self.privateCharacter?.detained || state.self.privateCharacter?.silenced;
-  $("roundEventChoices").innerHTML = event.choices.map((choice) => `<button class="round-event-choice ${game.eventVote === choice.id ? "selected" : ""}" data-modal-event-choice="${escapeHtml(choice.id)}" ${event.resolved || cannotVote ? "disabled" : ""}><strong>${escapeHtml(choice.label)}</strong>${chanceBadgeHtml(choice.chanceLabel, choice.chanceTone)}<small>${choice.impact?.length ? `Може вплинути: ${escapeHtml(eventImpactLabel(choice.impact))}` : "Наслідки залежать від складу групи"}</small>${choice.preview?.explanation ? `<em>${escapeHtml(choice.preview.explanation)}</em>` : ""}</button>`).join("");
-  document.querySelectorAll("[data-modal-event-choice]").forEach((button) => button.onclick = () => sendAction("event_vote", { choiceId: button.dataset.modalEventChoice }));
-  $("roundEventModalResult").classList.toggle("hidden", !event.resolved);
-  $("roundEventModalResult").textContent = event.resultText || "";
-  $("roundEventReasonReport").classList.toggle("hidden", !event.reasonReport);
+  const cannotVote = !event.canVote;
+  const selectedEventChoice = pendingEventChoiceId || game.eventVote || null;
+  $("roundEventChoices").innerHTML = `<p class="event-decision-policy">${escapeHtml(event.decisionPolicyLabel || "")}</p>` + event.choices.map((choice, index) => `<button class="round-event-choice council-option ${selectedEventChoice === choice.id ? "selected" : ""}" data-modal-event-choice="${escapeHtml(choice.id)}" ${event.resolved || cannotVote ? "disabled" : ""}><span class="council-option-index">${String(index + 1).padStart(2, "0")}</span><div class="council-option-copy"><strong>${escapeHtml(choice.label)}</strong>${chanceBadgeHtml(choice.chanceLabel, choice.chanceTone)}<small>${choice.impact?.length ? `Може вплинути: ${escapeHtml(eventImpactLabel(choice.impact))}` : "Наслідки залежать від складу групи"}</small>${choice.preview?.explanation ? `<em>${escapeHtml(choice.preview.explanation)}</em>` : ""}</div><span class="council-option-mark" aria-hidden="true">${selectedEventChoice === choice.id ? "✓" : ""}</span></button>`).join("");
+  document.querySelectorAll("[data-modal-event-choice]").forEach((button) => button.onclick = () => {
+    pendingEventChoiceId = button.dataset.modalEventChoice;
+    document.querySelectorAll("[data-modal-event-choice]").forEach((item) => item.classList.toggle("selected", item === button));
+    const confirm = $("roundEventConfirm");
+    if (confirm) {
+      confirm.disabled = false;
+      confirm.textContent = game.eventVote === pendingEventChoiceId ? "Рішення вже зафіксовано" : "Підтвердити рішення";
+    }
+  });
+  const eventConfirm = $("roundEventConfirm");
+  if (eventConfirm) {
+    eventConfirm.classList.toggle("hidden", event.resolved || cannotVote);
+    eventConfirm.disabled = !selectedEventChoice || selectedEventChoice === game.eventVote;
+    eventConfirm.textContent = selectedEventChoice === game.eventVote && selectedEventChoice ? "Рішення вже зафіксовано" : "Підтвердити рішення";
+    eventConfirm.onclick = () => {
+      const choiceId = pendingEventChoiceId || game.eventVote;
+      if (!choiceId) return;
+      sendAction("event_vote", { choiceId });
+      pendingEventChoiceId = null;
+    };
+  }
+  const hasReasonReport = Boolean(event.reasonReport);
+  $("roundEventModalResult").classList.toggle("hidden", !event.resolved || hasReasonReport);
+  $("roundEventModalResult").textContent = hasReasonReport ? "" : (event.resultText || "");
+  $("roundEventReasonReport").classList.toggle("hidden", !hasReasonReport);
   $("roundEventReasonReport").innerHTML = reasonReportHtml(event.reasonReport);
-  $("roundEventVoteCount").textContent = `Голосів: ${event.voteCount || 0}`;
+  $("roundEventVoteCount").textContent = event.decisionPolicy === "host" ? (event.voteCount ? "Рішення хоста зафіксовано" : "Очікується рішення хоста") : `Голосів: ${event.voteCount || 0}/${event.requiredCount || 0}`;
   $("roundEventResolve").classList.toggle("hidden", !state.self.isHost || event.resolved);
   $("roundEventResolve").onclick = () => sendAction("resolve_event");
   if (lastEventModalId !== event.id) {
     lastEventModalId = event.id;
+    pendingEventChoiceId = null;
     openRoundEventModal();
   }
 }
@@ -683,13 +756,20 @@ function toast(message, error = false) {
 }
 function saveSession(value) {
   session = value;
-  if (value) localStorage.setItem("shelter100-session", JSON.stringify(value));
-  else localStorage.removeItem("shelter100-session");
+  localStorage.removeItem("shelter100-session");
+  if (value) sessionStorage.setItem("shelter129-room-session", JSON.stringify(value));
+  else sessionStorage.removeItem("shelter129-room-session");
   updateResumeButton();
 }
 function readSession() {
-  try { return JSON.parse(localStorage.getItem("shelter100-session") || "null"); }
-  catch { return null; }
+  try {
+    const raw = sessionStorage.getItem("shelter129-room-session") || localStorage.getItem("shelter100-session");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    sessionStorage.setItem("shelter129-room-session", JSON.stringify(parsed));
+    localStorage.removeItem("shelter100-session");
+    return parsed;
+  } catch { return null; }
 }
 function updateResumeButton() {
   const saved = readSession();
@@ -699,7 +779,15 @@ function updateResumeButton() {
 async function api(path, options = {}) {
   const headers = { ...(options.headers || {}) };
   if (options.body) headers["Content-Type"] = "application/json";
-  if (session?.playerId) headers["X-Player-Id"] = session.playerId;
+  if (session?.playerId) {
+    headers["X-Player-Id"] = session.playerId;
+    headers["X-Player-Token"] = session.token;
+  }
+  const account = readAccountSession();
+  if (account) {
+    headers.Authorization = `Bearer ${account.token}`;
+    headers["X-Account-Id"] = account.accountId;
+  }
   const response = await fetch(path, {
     method: options.method || "GET",
     headers: Object.keys(headers).length ? headers : undefined,
@@ -707,7 +795,17 @@ async function api(path, options = {}) {
     cache: "no-store",
     signal: options.signal
   });
-  const payload = await response.json().catch(() => ({ ok: false, error: "Сервер повернув некоректну відповідь." }));
+  const contentType = String(response.headers.get("Content-Type") || "");
+  let payload;
+  if (contentType.includes("application/json")) payload = await response.json().catch(() => null);
+  else {
+    const text = await response.text().catch(() => "");
+    const gatewayFailure = response.status === 502 || /bad gateway/i.test(text);
+    payload = { ok: false, error: gatewayFailure
+      ? "Публічний тунель втратив зв’язок із сервером. Хосту треба перезапустити start_internet.bat і надіслати нове посилання."
+      : "Сервер повернув некоректну відповідь." };
+  }
+  payload ||= { ok: false, error: "Сервер повернув некоректну відповідь." };
   if (!response.ok || !payload.ok) {
     const error = new Error(payload.error || `Помилка ${response.status}`);
     error.status = response.status;
@@ -793,8 +891,6 @@ async function poll() {
     const previousRevision = state?.revision;
     const waitMs = previousRevision == null ? 0 : pollWaitMs();
     const query = new URLSearchParams({
-      playerId: session.playerId,
-      token: session.token,
       sinceRevision: String(previousRevision ?? -1),
       waitMs: String(waitMs)
     });
@@ -883,21 +979,55 @@ function renderSessionManagement(scope = "lobby") {
   }
 }
 
+function normalizeGenerationSeedClient(value) {
+  return String(value || "").normalize("NFKD").toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
+}
+function randomGenerationSeed() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = new Uint32Array(12);
+  crypto.getRandomValues(bytes);
+  return [0, 1, 2].map((group) => [0, 1, 2, 3].map((offset) => alphabet[bytes[group * 4 + offset] % alphabet.length]).join("")).join("-");
+}
+function renderGenerationPanel(scope = "lobby") {
+  const generation = state?.generation;
+  if (!generation) return;
+  if (scope === "lobby") {
+    $("lobbyGenerationSeedValue").textContent = generation.seed || "—";
+    $("lobbyGenerationConfigCode").textContent = generation.configCode || "—";
+    $("lobbyGenerationSchema").textContent = generation.schema || "—";
+    $("lobbyGenerationFingerprintCard").classList.toggle("hidden", !generation.fingerprint);
+    $("lobbyGenerationFingerprint").textContent = generation.fingerprint || "—";
+    $("lobbyGenerationNote").textContent = generation.note || "";
+  } else {
+    $("gameGenerationSeedValue").textContent = generation.seed || "—";
+    $("gameGenerationConfigCode").textContent = generation.configCode || "—";
+    $("gameGenerationFingerprint").textContent = generation.fingerprint || "—";
+    $("gameGenerationPanel").classList.toggle("generation-migrated", generation.reproducible === false);
+  }
+}
+async function copyGenerationValue(value, label) {
+  if (!value) return;
+  try { await navigator.clipboard.writeText(value); toast(`${label} скопійовано.`); }
+  catch { toast(`${label}: ${value}`); }
+}
+
 function renderLobby() {
   showScreen("roomScreen");
   $("roomCode").textContent = state.code;
   const settingNames = { modern: "Наші дні", fantasy: "Темне фентезі", space: "Далекий космос", postapocalypse: "Постапокаліпсис", cyberpunk: "Кіберпанк", horror: "Горор", detective: "Детектив" };
   const modeInfo = MODE_INFO[state.settings.mode] || MODE_INFO.classic;
   $("roomSettings").innerHTML = [
-    modeInfo.name, `Цикл: ${modeLoopPreview(state.settings.mode, state.settings.advancedModules, state.settings.setting).join(" → ")}`, settingNames[state.settings.setting],
+    state.settings.soloTestMode ? "Соло-тестування" : (state.settings.tutorialEnabled ? "Навчальна партія" : modeInfo.name), `Цикл: ${(state.settings.tutorialEnabled ? ["Розкриття", "Обговорення", "Криза", "Наслідки", "Рішення громади", "Фінал"] : modeLoopPreview(state.settings.mode, state.settings.advancedModules, state.settings.setting)).join(" → ")}`, settingNames[state.settings.setting],
     ...(state.settings.mode === "advanced" ? (state.settings.advancedModules || []).map((id) => `Модуль: ${ADVANCED_MODULE_INFO[id]?.name || id}`) : []),
     state.settings.scenarioMode === "catalog" ? "Готова катастрофа" : "Процедурна катастрофа",
+    state.generation?.seed ? `Seed: ${state.generation.seed}` : null,
     modeInfo.elimination ? `${state.settings.capacity} місць` : "Без вигнання",
     modeInfo.elimination ? (state.settings.voteSystem === "tribunal" ? "Трибунал" : "Вигнання") : null,
     `${state.settings.rounds} раунди`, `${state.settings.revealsPerRound} характеристики за раунд`, `${CHARACTER_SET_LABELS[state.settings.characterSetMode || "extended"] || "Розширений"} набір`, state.settings.setting === "detective" ? null : (state.settings.demographicsEnabled === false ? "Демографія вимкнена" : "Демографія в епілозі"), AUTOMATION_LABELS[state.settings.automationMode || "off"], ABSURDITY[state.settings.absurdity],
     state.settings.campaignName ? `Кампанія: ${state.settings.campaignName}` : null,
     state.settings.contentPackName ? `Набір: ${state.settings.contentPackName}` : null
   ].filter(Boolean).map((item) => `<span class="badge">${escapeHtml(item)}</span>`).join("");
+  renderGenerationPanel("lobby");
   renderVictoryRuleCards("lobbyVictoryRules", state.victoryRules || previewVictoryRules(state.settings.mode, state.settings.setting, state.settings.rounds, state.settings.capacity, state.settings.advancedModules));
   $("lobbyEndCondition").textContent = `Завершення: ${(state.victoryRules || {}).end?.objective || "умова визначається режимом"}`;
   $("playerCount").textContent = `${state.players.length}/12`;
@@ -912,18 +1042,28 @@ function renderLobby() {
   const allReady = state.players.every((player) => player.ready || player.isHost);
   const savedAnalysis = state.configurationAnalysis || analyzeClientConfiguration(state.settings, state.players.length);
   renderConfigurationAnalysis("lobby", savedAnalysis);
-  $("startButton").disabled = state.players.length < 4 || !allReady || Boolean(savedAnalysis.blocking);
+  const minimumPlayers = state.settings.soloTestMode ? 1 : (state.settings.tutorialEnabled ? 3 : 4);
+  $("startButton").disabled = state.players.length < minimumPlayers || !allReady || Boolean(savedAnalysis.blocking);
   $("lobbyTitle").textContent = state.self.isHost ? "Запросіть друзів" : "Очікуйте старту";
+  $("lobbyMinimumHint").textContent = state.settings.soloTestMode ? "Соло-тестування активне: кімнату можна запустити одному." : state.settings.tutorialEnabled ? "Для навчальної партії потрібно щонайменше троє. Перший раунд проходить без санкцій." : "Потрібно щонайменше четверо. Після старту нові гравці вже не зможуть приєднатися.";
   const blockingText = (savedAnalysis.issues || []).filter((item) => item.severity === "error").map((item) => item.title).join(" · ");
-  $("lobbyError").textContent = state.players.length < 4 ? "Потрібно щонайменше 4 гравці." : !allReady ? "Не всі гравці підтвердили готовність." : savedAnalysis.blocking ? blockingText : savedAnalysis.warnings ? "Старт можливий, але перевірте попередження конфігурації." : "Усе готово до старту.";
+  $("lobbyError").textContent = state.players.length < minimumPlayers ? `Потрібно щонайменше ${minimumPlayers} гравці.` : !allReady ? "Не всі гравці підтвердили готовність." : savedAnalysis.blocking ? blockingText : savedAnalysis.warnings ? "Старт можливий, але перевірте попередження конфігурації." : "Усе готово до старту.";
+  if ($("lobbySummaryRoomCode")) $("lobbySummaryRoomCode").textContent = state.code;
+  if ($("lobbySummaryPlayers")) $("lobbySummaryPlayers").textContent = `${state.players.length}`;
+  if ($("lobbySummaryReady")) $("lobbySummaryReady").textContent = `${state.players.filter((player) => player.ready || player.isHost).length}`;
+  if ($("lobbySummaryCapacity")) $("lobbySummaryCapacity").textContent = modeInfo.elimination ? `${state.settings.capacity}` : "Без ліміту";
+  if ($("lobbyBriefingStatus")) $("lobbyBriefingStatus").textContent = state.players.length < minimumPlayers ? "Очікування учасників" : !allReady ? "Очікування готовності" : savedAnalysis.blocking ? "Потрібна зміна параметрів" : "Гермодвері готові до закриття";
   renderSessionManagement("lobby");
 
   $("lobbySettingsPanel").classList.toggle("hidden", !state.self.isHost);
   if (state.self.isHost && !controlsAreActive()) {
+    $("lobbyTutorialEnabled").checked = state.settings.tutorialEnabled === true;
+    if ($("lobbySoloTestMode")) $("lobbySoloTestMode").checked = state.settings.soloTestMode === true;
     $("lobbyGameMode").value = state.settings.mode || "classic";
     $("lobbySetting").value = state.settings.setting;
     renderAdvancedModules("lobby", state.settings.advancedModules || []);
     $("lobbyScenarioMode").value = state.settings.scenarioMode || "procedural";
+    $("lobbyGenerationSeed").value = state.generation?.seed || state.settings.generationSeed || "";
     refreshPlatformSelects();
     $("lobbyCampaign").value = state.settings.campaignId || "";
     $("lobbyContentPack").value = state.settings.contentPackId || "";
@@ -949,13 +1089,22 @@ function renderLobby() {
     $("lobbySettingsHostFailoverEnabled").checked = state.settings.hostFailoverEnabled !== false;
     $("lobbySettingsHostFailoverSeconds").value = Number(state.settings.hostFailoverSeconds || 120);
     syncModeFields("lobby");
+    applyTutorialPresetClient("lobby");
   }
 }
 
 function resourceToneClass(value) {
-  if (value < 25) return "critical";
-  if (value < 50) return "warning";
+  if (value < 20) return "critical";
+  if (value < 40) return "warning";
   return "good";
+}
+function resourceLevel(value) {
+  const number = Number(value || 0);
+  if (number < 20) return "Критично";
+  if (number < 40) return "Мало";
+  if (number < 65) return "Достатньо";
+  if (number < 85) return "Стабільно";
+  return "Надлишок";
 }
 function assetText(asset) {
   return typeof asset === "string" ? asset : `${asset.name}${asset.description ? ` — ${asset.description}` : ""}`;
@@ -976,6 +1125,48 @@ function renderScenarioPriorities(priorities) {
   $("scenarioPriorityConditions").innerHTML = scenarioPriorityItemsHtml(priorities.conditions, "condition");
   const risk = priorities.longTermRisk;
   $("scenarioPriorityLongTerm").innerHTML = `<div><small>1 довгостроковий ризик</small><strong>${escapeHtml(risk.title || "Невідомий ризик")}</strong></div><p>${escapeHtml(risk.detail || "")}</p>`;
+}
+function campaignEffectText(effects = {}) {
+  return Object.entries(effects).map(([key, value]) => {
+    const label = key === "allies" ? "Союзники" : (RESOURCE_LABELS[key] || key);
+    return `${label} ${Number(value) >= 0 ? "+" : ""}${Number(value)}`;
+  }).join(" · ") || "Без прямої числової зміни";
+}
+function renderCampaignLegacy(legacy) {
+  const visible = Boolean(legacy?.enabled && legacy.dilemma);
+  $("campaignLegacyPanel").classList.toggle("hidden", !visible);
+  if (!visible) return;
+  const dilemma = legacy.dilemma;
+  $("campaignLegacyTitle").textContent = dilemma.title || "Перевага з ціною";
+  $("campaignLegacyDeadline").textContent = dilemma.status === "resolved" ? "Вирішено" : `До кінця ${dilemma.dueRound}-го раунду`;
+  $("campaignLegacyDeadline").className = `badge ${dilemma.status === "resolved" ? "good" : state.game.round >= dilemma.dueRound ? "danger" : "accent"}`;
+  const source = legacy.sourceChapter;
+  $("campaignLegacySource").textContent = source ? `Розділ ${source.number}: ${source.verdict || "попередній результат"} · ${source.score ?? "?"}/100 · ${source.settlement || "сховище"}` : `Розділ ${legacy.chapterNumber} кампанії «${legacy.campaignName}»`;
+  $("campaignLegacyBenefit").textContent = dilemma.benefit || "Кампанійна перевага";
+  $("campaignLegacyContext").textContent = dilemma.context || "Громада має визначити ціну спадщини.";
+  $("campaignLegacyStarting").textContent = legacy.startingSummary ? `На старті: ${legacy.startingSummary}` : "";
+  $("campaignLegacyOptions").innerHTML = (dilemma.options || []).map((option) => {
+    const selected = legacy.myVote === option.id;
+    const resolved = dilemma.resolvedOptionId === option.id;
+    return `<article class="campaign-legacy-option ${selected ? "selected" : ""} ${resolved ? "resolved" : ""}">
+      <div class="campaign-option-head"><strong>${escapeHtml(option.label)}</strong><span class="badge">${option.votes || 0} голос.</span></div>
+      <p>${escapeHtml(option.description || "")}</p>
+      <small>${escapeHtml(campaignEffectText(option.effects))}${option.affordable ? "" : " · Зараз бракує ресурсів для виконання"}</small>
+      ${dilemma.status === "open" && legacy.canVote ? `<button class="button ${selected ? "primary" : "ghost"}" type="button" data-campaign-legacy-vote="${escapeHtml(option.id)}">${selected ? "Ваш вибір" : "Підтримати"}</button>` : ""}
+    </article>`;
+  }).join("");
+  $("campaignLegacyOptions").querySelectorAll("[data-campaign-legacy-vote]").forEach((button) => {
+    button.onclick = () => sendAction("campaign_legacy_vote", { optionId: button.dataset.campaignLegacyVote });
+  });
+  $("campaignLegacyStatus").textContent = dilemma.status === "resolved"
+    ? (dilemma.automatic ? "Рішення застосовано автоматично після завершення строку." : "Громада завершила кампанійне рішення.")
+    : `Подано голосів: ${legacy.votesCast}/${legacy.eligibleVoters}.${legacy.myVote ? " Ваш вибір збережено." : " Оберіть один підхід."}`;
+  $("campaignLegacyResolve").classList.toggle("hidden", !legacy.canResolve || dilemma.status !== "open");
+  $("campaignLegacyResolve").disabled = legacy.votesCast === 0 && state.game.round < dilemma.dueRound;
+  $("campaignLegacyResolve").textContent = legacy.votesCast >= legacy.eligibleVoters ? "Застосувати рішення" : "Завершити достроково";
+  $("campaignLegacyResolve").onclick = () => sendAction("resolve_campaign_legacy", { force: true });
+  $("campaignLegacyResult").classList.toggle("hidden", dilemma.status !== "resolved");
+  $("campaignLegacyResult").innerHTML = dilemma.status === "resolved" ? `<strong>Наслідок</strong><p>${escapeHtml(dilemma.resultText || "Рішення застосовано.")}</p>` : "";
 }
 function renderShelter(game) {
   $("catastropheTitle").textContent = game.catastrophe.title;
@@ -1015,9 +1206,9 @@ function renderShelter(game) {
       <b>${Number(item.amount).toLocaleString("uk-UA")} ${escapeHtml(item.unit)}</b>
     </div>`).join("") || '<p class="muted">Маніфест провіанту відсутній.</p>';
   $("resources").innerHTML = Object.entries(game.shelter.resources).map(([key, value]) => `
-    <div class="resource"><small>${RESOURCE_LABELS[key] || key}</small><strong class="${resourceToneClass(value)}">${value}%</strong></div>`).join("");
+    <div class="resource" ${state.self.isHost ? `title="Точне значення: ${Number(value)}%"` : ""}><small>${RESOURCE_LABELS[key] || key}</small><strong class="${resourceToneClass(value)}">${resourceLevel(value)}</strong>${state.self.isHost ? `<span>${Number(value)}%</span>` : ""}</div>`).join("");
   $("modules").innerHTML = game.shelter.modules.map((module) => `
-    <div class="module" title="${escapeHtml(module.description || "")}"><span><strong>${escapeHtml(module.name)}</strong><small>${module.condition}%</small></span><div class="progress"><span style="width:${module.condition}%"></span></div></div>`).join("");
+    <div class="module" title="${escapeHtml(module.description || "")}${state.self.isHost ? ` Точний стан: ${Number(module.condition)}%.` : ""}"><span><strong>${escapeHtml(module.name)}</strong><small>${resourceLevel(module.condition)}${state.self.isHost ? ` · ${Number(module.condition)}%` : ""}</small></span><div class="progress qualitative-progress"><span class="${resourceToneClass(module.condition)}" style="width:${Math.max(10, Math.min(100, Math.round(Number(module.condition) / 20) * 20))}%"></span></div></div>`).join("");
   const assets = [];
   if (game.shelter.allies) assets.push(`Союзники: ${game.shelter.allies}`);
   if (game.shelter.assets.length) assets.push(...game.shelter.assets.map(assetText));
@@ -1027,6 +1218,7 @@ function renderShelter(game) {
   if (state.game.features?.treatment) socialParts.push(`Допомога: ${social.treatmentCount}`);
   const socialLine = socialParts.length ? ` ${socialParts.join(" · ")}` : "";
   $("assets").textContent = `${assets.length ? `Надбання: ${assets.join(" · ")}` : "Надбань поки немає."}${socialLine}`;
+  renderCampaignLegacy(game.campaignLegacy);
 }
 function revealedData(raw) {
   if (raw && typeof raw === "object" && Object.prototype.hasOwnProperty.call(raw, "value")) return raw;
@@ -1039,7 +1231,8 @@ function conditionText(status) {
   if (status.medicalIsolation) parts.push("Медична ізоляція");
   if (status.protected) parts.push("Захищений");
   if (status.detained) parts.push("В ізоляції");
-  if (status.silenced) parts.push("Без права голосу");
+  if (status.silenced) parts.push("Без участі в рішеннях");
+  if (status.sanctionEffects?.length) parts.push(status.sanctionEffects.join("; "));
   return parts.join(" · ");
 }
 function renderRevealStrategy() {
@@ -1097,7 +1290,10 @@ function renderPublicPlayers() {
       return `<button type="button" class="revealed-row info-row" data-open-info data-info-label="${escapeHtml(characterKeyLabel(key))}" data-info-value="${escapeHtml(data.value)}" data-info-description="${escapeHtml(data.description || "Для цієї характеристики окремого опису немає.")}"><span>${escapeHtml(characterKeyLabel(key))}</span><strong>${escapeHtml(data.value)}</strong><b aria-hidden="true">ⓘ</b></button>`;
     }).join("");
     const medical = player.status?.medical;
-    const medicalRow = medical ? `<div class="revealed-row medical-public"><span>Тяжкість стану</span><strong>${escapeHtml(medical.severityLabel)} · ${escapeHtml(medical.name)}</strong></div>` : "";
+    const healthAlreadyRevealed = entries.some(([key]) => key === "health");
+    const medicalRow = medical && (medical.severity > 0 || !healthAlreadyRevealed)
+      ? `<div class="revealed-row medical-public"><span>${medical.severity > 0 ? "Медичний стан" : "Здоров’я"}</span><strong>${escapeHtml(medical.severity > 0 ? `${medical.severityLabel} · ${medical.name}` : medical.name)}</strong></div>`
+      : "";
     const statusBadge = player.active ? (player.status?.medicalIsolation ? "Медична ізоляція" : player.status?.detained ? "Ізоляція" : player.status?.silenced ? "Без голосу" : player.connected ? "У грі" : "Офлайн") : player.outsideRole?.name || "Поза сховищем";
     const header = `<div class="public-card-heading"><div><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(conditionText(player.status))}</small></div><div class="public-badges"><span class="badge">${entries.length}/${totalCharacteristics}</span>${player.revealCredibility ? `<span class="badge credibility-badge">Відкритість ${player.revealCredibility}</span>` : ""}<span class="badge">${escapeHtml(statusBadge)}</span></div></div>`;
     const body = `<div class="revealed-list legacy-revealed">${rows || '<span class="muted empty-revealed">Ще нічого не відкрито.</span>'}${medicalRow}</div>`;
@@ -1127,6 +1323,8 @@ function renderPrivateCharacter() {
   const privateData = state.self.privateCharacter;
   $("privateName").textContent = state.self.name;
   if (!privateData) return;
+  const fileNumber = String(state.self.id || state.self.name || "КАНДИДАТ").replace(/[^A-Za-zА-Яа-яІіЇїЄєҐґ0-9]/g, "").slice(-6).toUpperCase() || "КАНДИДАТ";
+  $("dossierFileNumber").textContent = `СПРАВА ${fileNumber}`;
   $("privateStatus").textContent = state.self.active ? (privateData.detained ? "В ізоляції" : privateData.silenced ? "Без права голосу" : "Активний") : (privateData.outsideRole?.name || "Поза сховищем");
   const features = state.game.features || {};
   $("roleBox").classList.toggle("hidden", !features.hiddenRoles);
@@ -1142,7 +1340,13 @@ function renderPrivateCharacter() {
   const strategicChoices = new Set(revealStrategy.choiceKeys || []);
   const requestedChoices = new Set((revealStrategy.incomingRequests || []).map((item) => item.key));
   const pressureKey = revealStrategy.pressure?.key || null;
-  $("privateCharacter").innerHTML = Object.entries(privateData.values).map(([key, value]) => {
+  const dossierGroups = [
+    ["Ідентифікація", ["origin", "demographicContext", "age", "attitudeToChildren", "relationship"]],
+    ["Компетенції", ["profession", "skill", "hobby", "item"]],
+    ["Психологічний профіль", ["trait", "phobia", "secret"]],
+    ["Ризики та особливості", ["health", "anomaly"]]
+  ];
+  const renderDossierEntry = ([key, value]) => {
     const isRevealed = Boolean(privateData.revealed[key]);
     const description = privateData.descriptions?.[key] || "";
     const strategicClass = !isRevealed && strategicChoices.has(key) ? " strategic-choice" : "";
@@ -1158,11 +1362,17 @@ function renderPrivateCharacter() {
       <div class="char-card-top">
         ${canSelect && !isRevealed ? `<input class="reveal-select" type="checkbox" data-key="${key}" aria-label="Вибрати ${escapeHtml(characterKeyLabel(key))}" />` : ""}
         <div><p class="eyebrow">${escapeHtml(characterKeyLabel(key))}</p><strong>${escapeHtml(value)}</strong></div>
-        <span class="badge">${isRevealed ? "Відкрито" : "Приховано"}</span>
+        <span class="dossier-state" title="${isRevealed ? "Відкрито" : "Засекречено"}" aria-label="${isRevealed ? "Відкрито" : "Засекречено"}">${isRevealed ? "✓" : "⌁"}</span>
       </div>
       ${strategicBadges.length ? `<div class="char-strategy-badges">${strategicBadges.map((badge) => `<span>${escapeHtml(badge)}</span>`).join("")}</div>` : ""}
-      <button type="button" class="char-info-button" data-open-info data-info-label="${escapeHtml(characterKeyLabel(key))}" data-info-value="${escapeHtml(value)}" data-info-description="${escapeHtml(description)}">ⓘ Опис</button>
+      <button type="button" class="char-info-button" data-open-info data-info-label="${escapeHtml(characterKeyLabel(key))}" data-info-value="${escapeHtml(value)}" data-info-description="${escapeHtml(description)}" aria-label="Відкрити опис характеристики ${escapeHtml(characterKeyLabel(key))}" title="Докладніше">ⓘ</button>
     </article>`;
+  };
+  const valueEntries = Object.entries(privateData.values);
+  $("privateCharacter").innerHTML = dossierGroups.map(([title, keys]) => {
+    const entries = keys.map((key) => valueEntries.find(([entryKey]) => entryKey === key)).filter(Boolean);
+    if (!entries.length) return "";
+    return `<section class="dossier-group"><header><span>${escapeHtml(title)}</span><b>${entries.filter(([key]) => privateData.revealed[key]).length}/${entries.length}</b></header><div>${entries.map(renderDossierEntry).join("")}</div></section>`;
   }).join("");
   bindInfoButtons($("privateCharacter"));
   document.querySelectorAll(".reveal-select").forEach((checkbox) => checkbox.addEventListener("change", () => {
@@ -1335,7 +1545,7 @@ function renderOperations() {
     } else {
       const supportSummary = (operations.supportContributions || []).filter((item) => !item.usedFor).reduce((map, item) => { map[item.roleId] = (map[item.roleId] || 0) + 1; return map; }, {});
       const summaryText = `Спорядження: ${supportSummary.equipment || 0} · зв’язок: ${supportSummary.communications || 0} · охорона: ${supportSummary.guard || 0} · ремонтна допомога: ${supportSummary.repair_assist || 0}`;
-      const routeCards = (operations.expeditions || []).map((item, index) => `<label class="expedition-route ${operations.expeditionUsed ? "disabled" : ""}"><input type="radio" name="expeditionRoute" value="${escapeHtml(item.id)}" ${index === 0 ? "checked" : ""} ${operations.expeditionUsed ? "disabled" : ""}/><span><span class="route-head"><strong>${escapeHtml(item.name)}</strong><b>ризик ${item.difficulty}/6</b></span>${chanceBadgeHtml(item.preview?.label, item.preview?.tone)}<small>${escapeHtml(item.description)}</small>${item.requiredSkills?.length ? `<em>Корисні напрями: ${escapeHtml(item.requiredSkills.join(", "))}</em>` : ""}</span></label>`).join("");
+      const routeCards = (operations.expeditions || []).map((item, index) => `<label class="expedition-route ${operations.expeditionUsed ? "disabled" : ""}"><input type="radio" name="expeditionRoute" value="${escapeHtml(item.id)}" ${index === 0 ? "checked" : ""} ${operations.expeditionUsed ? "disabled" : ""}/><span><span class="route-head"><strong>${escapeHtml(item.name)} ${contentLevelBadgeHtml(item.level)}</strong><b>ризик ${item.difficulty}/6</b></span>${chanceBadgeHtml(item.preview?.label, item.preview?.tone)}<small>${escapeHtml(item.description)}</small></span></label>`).join("");
       const playerChecks = state.players.filter((player) => player.active).map((player) => `<label class="check-player"><input type="checkbox" data-expedition-player value="${player.id}" ${operations.expeditionUsed ? "disabled" : ""}/><span>${escapeHtml(player.name)}${player.operationSupport?.target === "expedition" && !player.operationSupport?.usedFor ? ` <small>(${escapeHtml(player.operationSupport.roleName)})</small>` : ""}</span></label>`).join("");
       const moduleOptions = state.game.shelter.modules.map((module) => `<option value="${module.id}">${escapeHtml(module.name)} — ${module.condition}%</option>`).join("");
       cards.push(`<section class="mini-action operation-card expedition-card"><div><strong>Командна експедиція</strong><small>Оберіть 1–3 польових учасників. Інші внески застосуються автоматично. Учасник польової групи не може одночасно дати зовнішній бонус підтримки.</small></div><div class="operation-support-summary">${escapeHtml(summaryText)}</div><div class="expedition-route-list">${routeCards || '<p class="muted">Маршрутів не знайдено.</p>'}</div><div class="check-player-grid">${playerChecks}</div><button id="launchExpeditionButton" class="button secondary full" type="button" ${operations.expeditionUsed ? "disabled" : ""}>${operations.expeditionUsed ? "Експедицію проведено" : "Відправити командну експедицію"}</button></section>`);
@@ -1440,6 +1650,7 @@ function renderOutsideCampBoard() {
 function renderActionPanel() {
   const game = state.game;
   ["operationsPanel", "eventPanel", "votePanel", "outsidePanel", "waitingPanel"].forEach((id) => $(id).classList.add("hidden"));
+  $("waitingPanel").classList.remove("compact-empty-phase");
   if (game.phase === "operations") {
     $("operationsPanel").classList.remove("hidden");
     renderOperations();
@@ -1461,13 +1672,28 @@ function renderActionPanel() {
     }
   } else if (game.phase === "event" && game.event) {
     $("eventPanel").classList.remove("hidden");
-    $("eventTitle").textContent = game.event.title;
+    $("eventTitle").innerHTML = `${escapeHtml(game.event.title)} ${contentLevelBadgeHtml(game.event.level)}`;
     $("eventDescription").textContent = game.event.description;
-    $("eventChoices").innerHTML = `<button id="openRoundEventButton" class="button primary full event-open-button" type="button">${game.event.resolved ? "Переглянути наслідок події" : "Відкрити подію та проголосувати"}</button>`;
+    $("eventChoices").innerHTML = `<button id="openRoundEventButton" class="button primary full event-open-button" type="button">${game.event.resolved ? "Переглянути наслідок події" : game.event.canVote ? (game.event.decisionPolicy === "host" ? "Відкрити подію та обрати рішення" : "Відкрити подію та проголосувати") : "Відкрити подію для обговорення"}</button>`;
     $("openRoundEventButton").onclick = openRoundEventModal;
-    $("eventResult").classList.toggle("hidden", !game.event.resolved);
-    $("eventResult").textContent = game.event.resultText || "";
+    const showCompactEventResult = Boolean(game.event.resolved && !game.event.reasonReport);
+    $("eventResult").classList.toggle("hidden", !showCompactEventResult);
+    $("eventResult").textContent = showCompactEventResult ? (game.event.resultText || "") : "";
     renderRoundEventModal(game);
+  } else if (game.phase === "reveal") {
+    const privateData = state.self.privateCharacter || {};
+    const remaining = Math.max(0, Number(privateData.revealLimit || 0) - Number(privateData.revealsUsedRound || 0));
+    if (remaining > 0) {
+      $("waitingPanel").classList.remove("hidden");
+      $("waitingPanel").classList.remove("compact-empty-phase");
+      $("waitingTitle").textContent = "Розкриття";
+      $("waitingText").textContent = `Залишилося відкрити: ${remaining}.`;
+    } else {
+      $("waitingPanel").classList.remove("hidden");
+      $("waitingPanel").classList.add("compact-empty-phase");
+      $("waitingTitle").textContent = "Очікування наступної фази";
+      $("waitingText").textContent = "Ваші характеристики відкрито.";
+    }
   } else if (game.phase === "elimination") {
     $("votePanel").classList.remove("hidden");
     const judgement = game.judgement || { system: "exile", visibility: "secret", appeals: [] };
@@ -1485,19 +1711,46 @@ function renderActionPanel() {
     $("voteRunoffBanner").textContent = runoff ? `Повторне голосування · ${runoff.options.length} варіанти-лідери` : "";
     $("voteSanctionWrap").classList.toggle("hidden", Boolean(runoff) || judgement.system !== "tribunal");
     if (ownVote?.sanction) $("voteSanction").value = ownVote.sanction;
+    const allowSoloSelfVote = state.settings?.soloTestMode === true && state.players.filter((item) => item.active).length === 1;
     if (runoff) {
-      $("eliminationChoices").innerHTML = runoff.options.map((option) => {
-        const selected = ownVote?.targetId === option.targetId && (option.targetId === "__skip__" || ownVote?.sanction === option.sanction);
+      $("eliminationChoices").innerHTML = runoff.options.map((option, index) => {
+        const selected = pendingJudgementChoice ? pendingJudgementChoice.targetId === option.targetId && pendingJudgementChoice.sanction === option.sanction : ownVote?.targetId === option.targetId && (option.targetId === "__skip__" || ownVote?.sanction === option.sanction);
         const selfTarget = option.targetId === state.self.id;
-        return `<button class="choice runoff-choice ${selected ? "selected" : ""}" data-runoff-target="${escapeHtml(option.targetId)}" data-runoff-sanction="${escapeHtml(option.sanction)}" ${cannotVote || selfTarget ? "disabled" : ""}><strong>${escapeHtml(option.label)}</strong><small>${selfTarget ? "Не можна голосувати за себе" : `Перший підрахунок: ${Number(option.count || 0)} голосів`}</small></button>`;
+        const player = state.players.find((item) => item.id === option.targetId);
+        const selfBlocked = selfTarget && !allowSoloSelfVote;
+        return `<button class="choice council-candidate runoff-choice ${selected ? "selected" : ""}" data-runoff-target="${escapeHtml(option.targetId)}" data-runoff-sanction="${escapeHtml(option.sanction)}" ${cannotVote || selfBlocked ? "disabled" : ""}><span class="council-candidate-number">${String(index + 1).padStart(2, "0")}</span><div class="council-candidate-main"><strong>${escapeHtml(option.label)}</strong><small>${selfBlocked ? "Не можна голосувати за себе" : selfTarget ? "DEV-соло: дозволене самоголосування" : `Перший підрахунок: ${Number(option.count || 0)} голосів`}</small><div class="council-facts">${player ? publicRevealPreview(player) : ""}</div></div><span class="council-selection-mark">${selected ? "✓" : ""}</span></button>`;
       }).join("");
-      document.querySelectorAll("[data-runoff-target]").forEach((button) => button.onclick = () => sendAction("elimination_vote", { targetId: button.dataset.runoffTarget, sanction: button.dataset.runoffSanction }));
+      document.querySelectorAll("[data-runoff-target]").forEach((button) => button.onclick = () => setPendingJudgementChoice(button.dataset.runoffTarget, button.dataset.runoffSanction, button));
     } else {
-      const candidates = state.players.filter((player) => player.active && player.id !== state.self.id);
-      const skipSelected = ownVote?.targetId === "__skip__";
-      const skip = `<button class="choice skip-choice ${skipSelected ? "selected" : ""}" data-target="__skip__" ${cannotVote ? "disabled" : ""}><strong>Без санкцій</strong><small>Не карати нікого цього раунду.</small></button>`;
-      $("eliminationChoices").innerHTML = skip + candidates.map((player) => `<button class="choice ${ownVote?.targetId === player.id ? "selected" : ""}" data-target="${player.id}" ${cannotVote ? "disabled" : ""}><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(conditionText(player.status))}</small></button>`).join("");
-      document.querySelectorAll("[data-target]").forEach((button) => button.onclick = () => sendAction("elimination_vote", { targetId: button.dataset.target, sanction: $("voteSanction").value }));
+      const candidates = state.players.filter((player) => player.active && (allowSoloSelfVote || player.id !== state.self.id));
+      const currentSanction = $("voteSanction").value;
+      const skipSelected = pendingJudgementChoice ? pendingJudgementChoice.targetId === "__skip__" : ownVote?.targetId === "__skip__";
+      const skip = `<button class="choice council-candidate skip-choice ${skipSelected ? "selected" : ""}" data-target="__skip__" ${cannotVote ? "disabled" : ""}><span class="council-candidate-number">00</span><div class="council-candidate-main"><strong>Без санкцій</strong><small>Залишити склад групи без змін цього раунду.</small><div class="council-facts"><span class="council-empty">Рішення без цілі</span></div></div><span class="council-selection-mark">${skipSelected ? "✓" : ""}</span></button>`;
+      $("eliminationChoices").innerHTML = skip + candidates.map((player, index) => {
+        const selected = pendingJudgementChoice ? pendingJudgementChoice.targetId === player.id : ownVote?.targetId === player.id;
+        return `<button class="choice council-candidate ${selected ? "selected" : ""}" data-target="${escapeHtml(player.id)}" ${cannotVote ? "disabled" : ""}><span class="council-candidate-number">${String(index + 1).padStart(2, "0")}</span><div class="council-candidate-main"><div class="council-candidate-title"><strong>${escapeHtml(player.name)}</strong><span>${escapeHtml(conditionText(player.status))}</span></div>${player.id === state.self.id && allowSoloSelfVote ? '<small class="solo-self-vote-note">DEV-соло: можна проголосувати за себе</small>' : ''}<div class="council-facts">${publicRevealPreview(player)}</div></div><span class="council-selection-mark">${selected ? "✓" : ""}</span></button>`;
+      }).join("");
+      document.querySelectorAll("[data-target]").forEach((button) => button.onclick = () => setPendingJudgementChoice(button.dataset.target, button.dataset.target === "__skip__" ? "none" : $("voteSanction").value, button));
+      $("voteSanction").onchange = () => {
+        pendingJudgementChoice = null;
+        document.querySelectorAll("[data-target]").forEach((item) => item.classList.remove("selected"));
+        $("voteConfirmButton").disabled = true;
+        $("voteConfirmSummary").textContent = "Оберіть кандидата або варіант без санкцій";
+      };
+    }
+    const voteConfirm = $("voteConfirmButton");
+    const voteConfirmSummary = $("voteConfirmSummary");
+    if (voteConfirm) {
+      voteConfirm.classList.toggle("hidden", cannotVote);
+      voteConfirm.disabled = !pendingJudgementChoice;
+      voteConfirm.onclick = () => {
+        if (!pendingJudgementChoice) return;
+        sendAction("elimination_vote", pendingJudgementChoice);
+        pendingJudgementChoice = null;
+      };
+    }
+    if (voteConfirmSummary && !pendingJudgementChoice) {
+      voteConfirmSummary.textContent = ownVote ? "Ваш попередній голос зафіксовано. Можна обрати інший варіант." : "Оберіть кандидата або варіант без санкцій";
     }
     const ledger = judgement.publicVotes || [];
     $("publicVoteLedger").classList.toggle("hidden", judgement.visibility !== "open");
@@ -1510,9 +1763,32 @@ function renderActionPanel() {
       document.querySelectorAll("[data-return-target]").forEach((button) => button.onclick = () => sendAction("return_vote", { targetId: button.dataset.returnTarget }));
     }
   } else {
+    pendingJudgementChoice = null;
     $("waitingPanel").classList.remove("hidden");
     $("waitingTitle").textContent = PHASES[game.phase][0];
     $("waitingText").textContent = PHASES[game.phase][1];
+  }
+}
+
+
+function publicRevealPreview(player, limit = 3) {
+  const entries = Object.entries(player?.revealed || {}).slice(0, limit);
+  if (!entries.length) return '<span class="council-empty">Відкритих даних ще немає</span>';
+  return entries.map(([key, raw]) => {
+    const data = revealedData(raw);
+    return `<span class="council-fact"><small>${escapeHtml(characterKeyLabel(key))}</small><b>${escapeHtml(data.value)}</b></span>`;
+  }).join("");
+}
+function setPendingJudgementChoice(targetId, sanction, button) {
+  pendingJudgementChoice = { targetId, sanction };
+  document.querySelectorAll("[data-target], [data-runoff-target]").forEach((item) => item.classList.toggle("selected", item === button));
+  const confirm = $("voteConfirmButton");
+  const summary = $("voteConfirmSummary");
+  if (confirm) confirm.disabled = false;
+  if (summary) {
+    const player = state.players.find((item) => item.id === targetId);
+    const sanctionLabels = { exile: "Вигнання", detention: "Ізоляція", silence: "Позбавлення голосу" };
+    summary.textContent = targetId === "__skip__" ? "Обрано: без санкцій" : `Обрано: ${player?.name || "кандидат"} · ${sanctionLabels[sanction] || sanction}`;
   }
 }
 
@@ -1621,7 +1897,7 @@ function renderHostControls() {
     intrigue: nextInfo ? `До фази «${nextInfo.label}»` : "Далі",
     investigation: nextInfo ? `До фази «${nextInfo.label}»` : "Далі",
     operations: nextInfo ? `До фази «${nextInfo.label}»` : "Далі",
-    event: game.features?.elimination ? "До рішення громади" : "До наслідків",
+    event: nextInfo ? `До фази «${nextInfo.label}»` : (game.features?.elimination ? "До рішення громади" : "До наслідків"),
     elimination: `${game.judgement?.runoff?.active ? "Підрахувати переголосування" : "Підрахувати рішення"} (${game.eliminationVoteCount}${game.returnVoteCount ? ` + ${game.returnVoteCount} апел.` : ""})`,
     round_end: "Завершити раунд"
   };
@@ -1653,9 +1929,31 @@ function renderFinalVictorySummary() {
   };
   target.innerHTML = resultCard(summary.group, "group", "Груповий результат") + resultCard(summary.personal, "personal", "Особистий результат") + resultCard(summary.special, "special", "Спеціальна умова");
 }
+function renderTutorialGuide() {
+  const tutorial = state.game?.tutorial;
+  const panel = $("tutorialGuidePanel");
+  if (!panel) return;
+  panel.classList.toggle("hidden", !tutorial?.enabled);
+  if (!tutorial?.enabled) return;
+  $("tutorialGuideTitle").textContent = tutorial.title || "Навчальний крок";
+  $("tutorialGuideStep").textContent = `${tutorial.step}/${tutorial.totalSteps}`;
+  $("tutorialGuideProgress").style.width = `${Math.max(0, Math.min(100, Number(tutorial.progressPercent || 0)))}%`;
+  $("tutorialGuideText").textContent = tutorial.text || "";
+  $("tutorialGuideChecklist").innerHTML = (tutorial.checklist || []).map((item) => `<div class="tutorial-check ${escapeHtml(item.status || "waiting")}"><span>${item.status === "done" ? "✓" : item.status === "pending" ? "!" : "•"}</span><p>${escapeHtml(item.label)}</p></div>`).join("");
+  const hostNote = $("tutorialGuideHostNote");
+  hostNote.classList.toggle("hidden", !tutorial.hostNote);
+  hostNote.textContent = tutorial.hostNote || "";
+  const button = $("tutorialGuidePrimary");
+  button.textContent = tutorial.button || "Перейти до кроку";
+  button.disabled = tutorial.completed;
+  button.onclick = () => selectGameTab(tutorial.targetTab || "turn", { scroll: true });
+  panel.classList.toggle("required", Boolean(tutorial.required));
+}
+
 function renderGame() {
   showScreen("gameScreen");
   const game = state.game;
+  renderGenerationPanel("game");
   renderShelter(game);
   const [phaseLabel, phaseHelp] = PHASES[game.phase] || [game.phaseInfo?.label || "Фаза", game.phaseInfo?.purpose || ""];
   $("phaseTitle").textContent = `Раунд ${game.round}/${game.maxRounds} · ${phaseLabel}`;
@@ -1673,6 +1971,7 @@ function renderGame() {
   renderOutsideCampBoard();
   renderJudgementProtocol();
   renderVictoryRules();
+  renderTutorialGuide();
   renderCurrentAction();
   renderHostDashboard();
   renderSessionManagement("game");
@@ -1681,7 +1980,16 @@ function renderGame() {
   $("reasonJournal").innerHTML = (game.reasonLog || []).length
     ? [...game.reasonLog].reverse().map((report) => reasonReportHtml(report, true)).join("")
     : '<div class="empty-card">Пояснень результатів ще немає. Вони з’являться після кризи, експедиції, ремонту або лікування.</div>';
-  $("gameLog").innerHTML = [...game.log].reverse().map((line) => `<div class="log-entry">${escapeHtml(line)}</div>`).join("");
+  const classifyLog = (line) => /голос|санкц|вигнан|апеляц/i.test(line) ? "votes" : /їж|вод|енерг|медикамент|ресурс|морал|цілісн/i.test(line) ? "resources" : /відкрива|персонаж|характерист|роль|здібн/i.test(line) ? "characters" : /таєм|розслід|доказ|підозр|фракц/i.test(line) ? "secrets" : /фаза|автомат|хост|сеанс|підключ/i.test(line) ? "system" : "key";
+  const filteredLog = [...game.log].reverse().filter((line) => activeLogFilter === "all" || classifyLog(line) === activeLogFilter);
+  const logMeta = { key:["Ключове","◆"], votes:["Рішення","◎"], resources:["Ресурси","▣"], characters:["Персонаж","◇"], secrets:["Таємниця","⌁"], system:["Система","≡"] };
+  $("gameLog").innerHTML = filteredLog.map((line) => { const category = classifyLog(line); const meta = logMeta[category] || logMeta.key; return `<article class="log-entry log-${category}" data-log-category="${category}"><span class="log-entry-icon">${meta[1]}</span><div><small>${meta[0]}</small><p>${escapeHtml(line)}</p></div></article>`; }).join("") || `<div class="log-empty-state"><strong>Записів у цій категорії немає</strong><span>Змініть фільтр або продовжуйте партію.</span></div>`;
+  const keyRoundLines = [...game.log].reverse().filter((line) => ["key", "votes"].includes(classifyLog(line))).slice(0, 6);
+  if ($("roundSummary")) $("roundSummary").innerHTML = keyRoundLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("") || '<p class="muted">Ключових подій у цьому раунді ще немає.</p>';
+  document.querySelectorAll("[data-log-filter]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.logFilter === activeLogFilter);
+    button.onclick = () => { activeLogFilter = button.dataset.logFilter; renderGame(); };
+  });
 }
 
 function renderFinal() {
@@ -1694,10 +2002,21 @@ function renderFinal() {
   $("finalGoalsSection").classList.toggle("hidden", !features.personalGoals && !detectiveMode);
   $("finalRolesSection").classList.toggle("hidden", !features.hiddenRoles && !detectiveMode);
   renderFinalVictorySummary();
+  $("finalTutorialPanel")?.classList.toggle("hidden", !state.settings?.tutorialEnabled);
   $("finalVerdict").textContent = final.verdict;
   $("finalScore").textContent = `${final.score}`;
   $("finalDescription").textContent = final.description;
   $("finalMetrics").innerHTML = (final.summaryStats || []).map((item) => `<article class="final-metric"><small>${escapeHtml(item.label)}</small><strong>${escapeHtml(item.value)}</strong><span>${escapeHtml(item.note || "")}</span></article>`).join("");
+  const layers = final.scoreLayers || { directScore: final.directScore ?? final.score, finalScore: final.score, forecastMin: final.forecastRange?.min, forecastMax: final.forecastRange?.max };
+  const forecastText = Number.isFinite(Number(layers.forecastMin)) && Number.isFinite(Number(layers.forecastMax)) ? `${Number(layers.forecastMin)}–${Number(layers.forecastMax)}/100` : "Немає даних";
+  $("finalScoreLayers").innerHTML = `<article><small>Результат партії</small><strong>${Number(layers.directScore || 0)}/100</strong><span>Лише контрольовані рішення</span></article><article class="neutral"><small>Прогноз майбутнього</small><strong>${forecastText}</strong><span>Окремий епілог, не модифікатор</span></article><article><small>Зафіксований підсумок</small><strong>${Number(layers.finalScore ?? final.score)}/100</strong><span>Прогноз не змінює перемогу</span></article>`;
+  const causalityCard = (item, assumption = false) => {
+    const numeric = Number(item.scoreImpact ?? item.value ?? 0);
+    const indicator = assumption ? `${numeric >= 0 ? "+" : ""}${numeric} б.` : `${numeric}/100`;
+    return `<article class="causality-card ${escapeHtml(item.impact || "neutral")}"><div><span class="badge">${escapeHtml(item.category || (assumption ? "Прогноз" : "Рішення"))}</span><strong>${indicator}</strong></div><h4>${escapeHtml(item.title || "Наслідок")}</h4><p>${escapeHtml(item.text || item.detail || "")}</p>${assumption ? '<small>Симуляційне припущення, а не гарантована подія.</small>' : '<small>Зафіксовано за станом і журналом основної партії.</small>'}</article>`;
+  };
+  $("finalDirectConsequences").innerHTML = (final.directConsequences || []).map((item) => causalityCard(item, false)).join("") || '<div class="empty-card">Прямі наслідки не сформовано.</div>';
+  $("finalSimulationAssumptions").innerHTML = (final.simulationAssumptions || []).map((item) => causalityCard(item, true)).join("") || '<div class="empty-card">Симуляційні припущення не сформовано.</div>';
   const simulation = final.longTermSimulation || null;
   const resourceLabels = { food: "Їжа", water: "Вода", energy: "Енергія", integrity: "Цілісність", medicine: "Медицина", morale: "Мораль" };
   $("simulationHorizonBadge").textContent = simulation ? `${simulation.horizonYears} років симуляції` : "Немає даних";
@@ -1829,7 +2148,59 @@ function syncModeDescription(scope = "create") {
   const moduleNames = modeSelect.value === "advanced" && setting !== "detective"
     ? modules.map((id) => ADVANCED_MODULE_INFO[id]?.name).filter(Boolean)
     : [];
-  description.innerHTML = `<strong>${escapeHtml(info.name)}</strong><span>${escapeHtml(info.description)}</span>${moduleNames.length ? `<div class="advanced-module-badges">${moduleNames.map((name) => `<span class="badge">${escapeHtml(name)}</span>`).join("")}</div>` : ""}<div class="mode-loop-preview">${loop.map((item, index) => `<b><i>${index + 1}</i>${escapeHtml(item)}</b>`).join('<em>→</em>')}</div>`;
+  const tutorial = tutorialScopeEnabled(scope);
+  const tutorialLoop = ["Розкриття", "Обговорення", "Криза", "Наслідки", "Другий раунд", "Рішення громади", "Фінал"];
+  description.innerHTML = tutorial
+    ? `<strong>Навчальна партія</strong><span>Керований вступ на 2 раунди: перший без санкцій, другий — із повним голосуванням та фіналом.</span><div class="mode-loop-preview">${tutorialLoop.map((item, index) => `<b><i>${index + 1}</i>${escapeHtml(item)}</b>`).join('<em>→</em>')}</div>`
+    : `<strong>${escapeHtml(info.name)}</strong><span>${escapeHtml(info.description)}</span>${moduleNames.length ? `<div class="advanced-module-badges">${moduleNames.map((name) => `<span class="badge">${escapeHtml(name)}</span>`).join("")}</div>` : ""}<div class="mode-loop-preview">${loop.map((item, index) => `<b><i>${index + 1}</i>${escapeHtml(item)}</b>`).join('<em>→</em>')}</div>`;
+}
+
+function tutorialScopeEnabled(scope = "create") {
+  return Boolean($(scope === "lobby" ? "lobbyTutorialEnabled" : "tutorialEnabled")?.checked);
+}
+function applyTutorialPresetClient(scope = "create") {
+  const lobby = scope === "lobby";
+  const enabled = tutorialScopeEnabled(scope);
+  const prefix = lobby ? "lobby" : "";
+  const ids = lobby
+    ? ["lobbyGameMode", "lobbySetting", "lobbyScenarioMode", "lobbyCapacity", "lobbyRounds", "lobbyReveals", "lobbyCampaign", "lobbyContentPack", "lobbyDemographicsEnabled", "lobbyCharacterSetMode", "lobbyVoteSystem", "lobbyVoteVisibility", "lobbyTieRule", "lobbyAutomationMode", "lobbyInactivityTimeoutSeconds", "lobbyPhaseTimeoutSeconds", "lobbyAbsurdity"]
+    : ["gameMode", "setting", "scenarioMode", "capacity", "rounds", "revealsPerRound", "campaignSelect", "contentPackSelect", "demographicsEnabled", "characterSetMode", "voteSystem", "voteVisibility", "tieRule", "automationMode", "inactivityTimeoutSeconds", "phaseTimeoutSeconds", "absurdity"];
+  if (enabled) {
+    $(lobby ? "lobbyGameMode" : "gameMode").value = "classic";
+    $(lobby ? "lobbySetting" : "setting").value = "modern";
+    $(lobby ? "lobbyScenarioMode" : "scenarioMode").value = "catalog";
+    const expected = lobby ? Math.max(3, Number(state?.players?.length || 3)) : Math.max(3, Number($("expectedPlayers")?.value || 3));
+    $(lobby ? "lobbyCapacity" : "capacity").value = Math.max(2, expected - 1);
+    $(lobby ? "lobbyRounds" : "rounds").value = 2;
+    $(lobby ? "lobbyReveals" : "revealsPerRound").value = 1;
+    $(lobby ? "lobbyCampaign" : "campaignSelect").value = "";
+    $(lobby ? "lobbyContentPack" : "contentPackSelect").value = "";
+    $(lobby ? "lobbyDemographicsEnabled" : "demographicsEnabled").checked = false;
+    $(lobby ? "lobbyCharacterSetMode" : "characterSetMode").value = "compact";
+    $(lobby ? "lobbyVoteSystem" : "voteSystem").value = "tribunal";
+    $(lobby ? "lobbyVoteVisibility" : "voteVisibility").value = "open";
+    $(lobby ? "lobbyTieRule" : "tieRule").value = "runoff";
+    $(lobby ? "lobbyAutomationMode" : "automationMode").value = "off";
+    $(lobby ? "lobbyAbsurdity" : "absurdity").value = 1;
+    if (!lobby && $("absurdityText")) $("absurdityText").textContent = ABSURDITY[1];
+  }
+  for (const id of ids) {
+    const control = $(id);
+    if (!control) continue;
+    control.disabled = enabled;
+    control.closest("label, section")?.classList.toggle("tutorial-locked", enabled);
+  }
+  $(lobby ? "lobbyTutorialModeCard" : "tutorialModeCard")?.classList.toggle("active", enabled);
+  if (enabled) {
+    renderAdvancedModules(scope, []);
+    syncDemographicsControl(scope);
+    renderCharacterSetPicker(scope, false);
+  } else {
+    syncDemographicsControl(scope);
+  }
+  syncModeDescription(scope);
+  renderVictoryPreview(scope);
+  renderConfigurationAnalysis(scope);
 }
 
 function syncModeFields(scope = "create") {
@@ -1865,8 +2236,27 @@ function syncDemographicsControl(scope = "create") {
   const note = card?.querySelector("small");
   if (note) note.textContent = detective ? "У детективному сетингу цей блок не використовується." : "Не впливає на поточну корисність; моделюється лише у довгому епілозі.";
 }
+function syncSoloTestMode(scope = "create") {
+  const lobby = scope === "lobby";
+  const toggle = $(lobby ? "lobbySoloTestMode" : "soloTestMode");
+  const capacity = $(lobby ? "lobbyCapacity" : "capacity");
+  if (!toggle || !capacity) return;
+  if (toggle.checked) {
+    capacity.min = "1"; capacity.value = "1";
+    if (!lobby && $("expectedPlayers")) { $("expectedPlayers").min = "1"; $("expectedPlayers").value = "1"; }
+  } else {
+    capacity.min = "2"; if (Number(capacity.value) < 2) capacity.value = "2";
+    if (!lobby && $("expectedPlayers")) { $("expectedPlayers").min = "4"; if (Number($("expectedPlayers").value) < 4) $("expectedPlayers").value = "4"; }
+  }
+  renderVictoryPreview(scope); renderConfigurationAnalysis(scope);
+}
+$("soloTestMode")?.addEventListener("change", () => syncSoloTestMode("create"));
+$("lobbySoloTestMode")?.addEventListener("change", () => syncSoloTestMode("lobby"));
 $("demographicsEnabled")?.addEventListener("change", () => { renderCharacterSetPicker("create", true); renderConfigurationAnalysis("create"); });
 $("lobbyDemographicsEnabled")?.addEventListener("change", () => { renderCharacterSetPicker("lobby", true); renderConfigurationAnalysis("lobby"); });
+$("tutorialEnabled")?.addEventListener("change", () => applyTutorialPresetClient("create"));
+$("lobbyTutorialEnabled")?.addEventListener("change", () => applyTutorialPresetClient("lobby"));
+$("expectedPlayers")?.addEventListener("input", () => { if (tutorialScopeEnabled("create")) applyTutorialPresetClient("create"); });
 $("gameMode").addEventListener("change", () => { renderAdvancedModules("create", $("gameMode").value === "advanced" ? DEFAULT_ADVANCED_MODULES : []); syncModeFields("create"); renderConfigurationAnalysis("create"); });
 $("setting").addEventListener("change", () => { refreshPlatformSelects(); syncDemographicsControl("create"); renderCharacterSetPicker("create", false); renderAdvancedModules("create"); renderVictoryPreview("create"); renderConfigurationAnalysis("create"); });
 $("lobbyGameMode").addEventListener("change", () => { renderAdvancedModules("lobby", $("lobbyGameMode").value === "advanced" ? DEFAULT_ADVANCED_MODULES : []); syncModeFields("lobby"); renderConfigurationAnalysis("lobby"); });
@@ -1880,13 +2270,30 @@ syncDemographicsControl("create");
 syncModeFields("create");
 renderCharacterSetPicker("create", false);
 renderConfigurationAnalysis("create");
+applyTutorialPresetClient("create");
 
+$("generationSeed")?.addEventListener("input", () => { $("generationSeed").value = normalizeGenerationSeedClient($("generationSeed").value); });
+$("lobbyGenerationSeed")?.addEventListener("input", () => { $("lobbyGenerationSeed").value = normalizeGenerationSeedClient($("lobbyGenerationSeed").value); });
+$("randomizeGenerationSeed")?.addEventListener("click", () => { $("generationSeed").value = randomGenerationSeed(); });
+$("lobbyRandomizeGenerationSeed")?.addEventListener("click", () => { $("lobbyGenerationSeed").value = randomGenerationSeed(); });
+$("lobbyCopyGenerationSeed")?.addEventListener("click", () => copyGenerationValue(state?.generation?.seed, "Seed"));
+$("lobbyCopyGenerationConfig")?.addEventListener("click", () => copyGenerationValue(state?.generation?.configCode, "Код конфігурації"));
+$("gameCopyGenerationBundle")?.addEventListener("click", () => {
+  const generation = state?.generation;
+  if (!generation) return;
+  copyGenerationValue(`Seed: ${generation.seed}
+Схема: ${generation.schema}
+Конфігурація: ${generation.configCode}
+Відбиток: ${generation.fingerprint || "—"}`, "Дані генерації");
+});
 $("absurdity").addEventListener("input", () => { $("absurdityText").textContent = ABSURDITY[Number($("absurdity").value)]; });
 $("createForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
     const payload = await api("/api/rooms/create", { method: "POST", body: {
       name: $("createName").value,
+      tutorialEnabled: $("tutorialEnabled").checked,
+      soloTestMode: $("soloTestMode")?.checked === true,
       mode: $("gameMode").value,
       advancedModules: selectedAdvancedModules(""),
       setting: $("setting").value,
@@ -1906,6 +2313,7 @@ $("createForm").addEventListener("submit", async (event) => {
       phaseTimeoutSeconds: Number($("phaseTimeoutSeconds").value),
       hostFailoverEnabled: $("hostFailoverEnabled").checked,
       hostFailoverSeconds: Number($("hostFailoverSeconds").value),
+      generationSeed: normalizeGenerationSeedClient($("generationSeed").value),
       campaignId: $("campaignSelect").value || null,
       contentPackId: $("contentPackSelect").value || null,
       ...accountCredentials()
@@ -1914,10 +2322,36 @@ $("createForm").addEventListener("submit", async (event) => {
     startPolling();
   } catch (error) { toast(error.message, true); }
 });
+function normalizeAccessCode(value, maxLength) {
+  return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, maxLength);
+}
+function bindAccessCodeInput(id, maxLength) {
+  const input = $(id);
+  if (!input) return;
+  input.addEventListener("input", () => {
+    const normalized = normalizeAccessCode(input.value, maxLength);
+    if (input.value !== normalized) input.value = normalized;
+  });
+}
+bindAccessCodeInput("joinCode", 10);
+bindAccessCodeInput("rejoinRoomCode", 6);
+bindAccessCodeInput("rejoinRecoveryCode", 10);
+bindAccessCodeInput("recoveryRequestRoomCode", 6);
+
 $("joinForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
-    const payload = await api("/api/rooms/join", { method: "POST", body: { name: $("joinName").value, code: $("joinCode").value, ...accountCredentials() } });
+    const enteredCode = normalizeAccessCode($("joinCode").value, 10);
+    if (enteredCode.length === 10) {
+      $("recoveryEntryDetails").open = true;
+      $("rejoinRecoveryCode").value = enteredCode;
+      $("joinCode").value = "";
+      $("rejoinRoomCode").focus();
+      toast("Це персональний код із 10 символів. Додатково введіть 6-символьний код кімнати у відкритій формі нижче.");
+      return;
+    }
+    if (enteredCode.length !== 6) throw new Error("Код кімнати має містити рівно 6 символів.");
+    const payload = await api("/api/rooms/join", { method: "POST", body: { name: $("joinName").value, code: enteredCode, ...accountCredentials() } });
     saveSession({ code: payload.code, playerId: payload.playerId, token: payload.token, recoveryCode: payload.recoveryCode || null });
     startPolling();
   } catch (error) { toast(error.message, true); }
@@ -1948,7 +2382,11 @@ async function pollRecoveryRequestStatus(requestData) {
 }
 $("rejoinSubmit").onclick = async () => {
   try {
-    const payload = await api("/api/rooms/rejoin", { method: "POST", body: { code: $("rejoinRoomCode").value, recoveryCode: $("rejoinRecoveryCode").value } });
+    const roomCodeValue = normalizeAccessCode($("rejoinRoomCode").value, 6);
+    const personalCodeValue = normalizeAccessCode($("rejoinRecoveryCode").value, 10);
+    if (roomCodeValue.length !== 6) throw new Error("Код кімнати має містити рівно 6 символів.");
+    if (personalCodeValue.length !== 10) throw new Error("Персональний код має містити рівно 10 символів.");
+    const payload = await api("/api/rooms/rejoin", { method: "POST", body: { code: roomCodeValue, recoveryCode: personalCodeValue } });
     saveSession({ code: payload.code, playerId: payload.playerId, token: payload.token, recoveryCode: payload.recoveryCode || null });
     toast(`Сеанс ${payload.name || "гравця"} відновлено.`);
     startPolling();
@@ -1956,7 +2394,9 @@ $("rejoinSubmit").onclick = async () => {
 };
 $("recoveryRequestSubmit").onclick = async () => {
   try {
-    const payload = await api("/api/rooms/recovery-request", { method: "POST", body: { code: $("recoveryRequestRoomCode").value, name: $("recoveryRequestName").value } });
+    const roomCodeValue = normalizeAccessCode($("recoveryRequestRoomCode").value, 6);
+    if (roomCodeValue.length !== 6) throw new Error("Код кімнати має містити рівно 6 символів.");
+    const payload = await api("/api/rooms/recovery-request", { method: "POST", body: { code: roomCodeValue, name: $("recoveryRequestName").value } });
     const requestData = { code: payload.code, requestId: payload.requestId, requestToken: payload.requestToken, playerName: payload.playerName };
     localStorage.setItem("shelter100-recovery-request", JSON.stringify(requestData));
     await pollRecoveryRequestStatus(requestData);
@@ -1966,6 +2406,8 @@ $("resumeButton").onclick = () => { saveSession(readSession()); startPolling(); 
 $("readyButton").onclick = () => sendAction("ready", { value: !state.self.ready });
 $("startButton").onclick = () => sendAction("start");
 $("saveLobbySettings").onclick = () => sendAction("update_settings", {
+  tutorialEnabled: $("lobbyTutorialEnabled").checked,
+  soloTestMode: $("lobbySoloTestMode")?.checked === true,
   mode: $("lobbyGameMode").value,
   advancedModules: selectedAdvancedModules("lobby"),
   setting: $("lobbySetting").value,
@@ -1985,6 +2427,7 @@ $("saveLobbySettings").onclick = () => sendAction("update_settings", {
   phaseTimeoutSeconds: Number($("lobbyPhaseTimeoutSeconds").value),
   hostFailoverEnabled: $("lobbySettingsHostFailoverEnabled").checked,
   hostFailoverSeconds: Number($("lobbySettingsHostFailoverSeconds").value),
+  generationSeed: normalizeGenerationSeedClient($("lobbyGenerationSeed").value),
   campaignId: $("lobbyCampaign").value || null,
   contentPackId: $("lobbyContentPack").value || null
 });
@@ -2040,6 +2483,68 @@ window.addEventListener("offline", () => {
   $("connectionBadge").classList.add("connection-error");
 });
 
+
+function initializeLobbyDrawer() {
+  const backdrop = $("lobbyDrawerBackdrop");
+  const drawer = $("lobbyConfigDrawer");
+  if (!backdrop || !drawer) return;
+  const open = (tab = "overview") => {
+    backdrop.classList.remove("hidden");
+    drawer.setAttribute("aria-hidden", "false");
+    document.body.classList.add("lobby-drawer-open");
+    document.querySelectorAll("[data-lobby-drawer-tab]").forEach((button) => button.classList.toggle("active", button.dataset.lobbyDrawerTab === tab));
+    document.querySelectorAll("[data-lobby-drawer-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.lobbyDrawerPanel === tab));
+  };
+  const close = () => {
+    backdrop.classList.add("hidden");
+    drawer.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("lobby-drawer-open");
+  };
+  $("openLobbyDrawer")?.addEventListener("click", () => open("overview"));
+  $("openLobbyDrawerSecondary")?.addEventListener("click", () => open("overview"));
+  $("closeLobbyDrawer")?.addEventListener("click", close);
+  backdrop.addEventListener("click", (event) => { if (event.target === backdrop) close(); });
+  document.querySelectorAll("[data-lobby-drawer-tab]").forEach((button) => button.addEventListener("click", () => open(button.dataset.lobbyDrawerTab)));
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !backdrop.classList.contains("hidden")) close(); });
+}
+
+function initializeSetupLevels() {
+  const customIds = ["setting", "scenarioMode", "rounds", "revealsPerRound", "characterSetMode", "voteSystem", "voteVisibility", "tieRule"];
+  const expertIds = ["tutorialModeCard", "advancedModulesPicker", "campaignSelect", "contentPackSelect", "demographicsCard", "automationMode", "inactivityTimeoutSeconds", "phaseTimeoutSeconds", "hostFailoverEnabled", "hostFailoverSeconds", "generationSeed", "randomizeGenerationSeed"];
+  const owner = (id) => {
+    const node = $(id);
+    if (!node) return null;
+    return node.matches("section,[id$='Card']") ? node : node.closest("section,label") || node;
+  };
+  const customNodes = [...new Set(customIds.map(owner).filter(Boolean))];
+  const expertNodes = [...new Set(expertIds.map(owner).filter(Boolean))];
+  const applyLevel = (level) => {
+    document.querySelectorAll("[data-setup-level]").forEach((button) => button.classList.toggle("active", button.dataset.setupLevel === level));
+    customNodes.forEach((node) => node.classList.toggle("setup-hidden", level === "quick"));
+    expertNodes.forEach((node) => node.classList.toggle("setup-hidden", level !== "expert"));
+    $("setupLevelNote").textContent = level === "quick" ? "Показано лише параметри, потрібні для швидкого старту." : level === "custom" ? "Доступні правила, тривалість і набір характеристик." : "Відкрито seed, модулі, кампанію, автоматизацію та технічні тайм-аути.";
+  };
+  document.querySelectorAll("[data-setup-level]").forEach((button) => { button.onclick = () => applyLevel(button.dataset.setupLevel); });
+  const presets = {
+    classic: { mode: "classic", setting: "modern", players: 6, capacity: 3, rounds: 4, reveals: 2, absurdity: 2, vote: "exile", automation: "off", characterSet: "extended" },
+    survival: { mode: "survival", setting: "modern", players: 6, capacity: 6, rounds: 4, reveals: 2, absurdity: 1, vote: "tribunal", automation: "assist", characterSet: "extended" },
+    detective: { mode: "advanced", setting: "detective", players: 7, capacity: 5, rounds: 4, reveals: 2, absurdity: 0, vote: "tribunal", automation: "assist", modules: [], characterSet: "extended" },
+    chaos: { mode: "advanced", setting: "modern", players: 8, capacity: 4, rounds: 4, reveals: 2, absurdity: 4, vote: "tribunal", automation: "assist", modules: ["operations"], characterSet: "extended" },
+    short: { mode: "classic", setting: "modern", players: 6, capacity: 4, rounds: 3, reveals: 2, absurdity: 2, vote: "exile", automation: "assist", characterSet: "compact" }
+  };
+  document.querySelectorAll("[data-game-preset]").forEach((button) => { button.onclick = () => {
+    const preset = presets[button.dataset.gamePreset];
+    if (!preset) return;
+    $("gameMode").value = preset.mode; $("setting").value = preset.setting; $("expectedPlayers").value = preset.players; $("capacity").value = preset.capacity; $("rounds").value = preset.rounds; $("revealsPerRound").value = preset.reveals; $("absurdity").value = preset.absurdity; $("voteSystem").value = preset.vote; $("voteVisibility").value = "secret"; $("automationMode").value = preset.automation; $("characterSetMode").value = preset.characterSet || "extended"; renderCharacterSetPicker("create", false);
+    renderAdvancedModules("create", preset.mode === "advanced" ? (preset.modules || DEFAULT_ADVANCED_MODULES) : []);
+    syncModeFields("create"); $("absurdity").dispatchEvent(new Event("input")); renderConfigurationAnalysis("create");
+    toast(`Застосовано пресет «${button.textContent.trim()}».`);
+  }; });
+  applyLevel("quick");
+}
+
+initializeLobbyDrawer();
+initializeSetupLevels();
 updateResumeButton();
 try {
   const pendingRecovery = JSON.parse(localStorage.getItem("shelter100-recovery-request") || "null");

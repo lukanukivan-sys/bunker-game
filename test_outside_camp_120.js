@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { stopChildProcess } = require("./test_support");
 
 const root = __dirname;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "bunker-outside-camp-"));
@@ -31,8 +32,7 @@ async function state(code, session) {
   return api(`/api/rooms/${code}/state?playerId=${session.playerId}&token=${session.token}`);
 }
 async function stop() {
-  if (!child || child.killed) return;
-  await new Promise((resolve) => { child.once("exit", resolve); child.kill("SIGTERM"); setTimeout(resolve, 1500); });
+  await stopChildProcess(child);
 }
 async function resolveEvent(code, host, sessions) {
   let s = await state(code, host);
@@ -40,7 +40,7 @@ async function resolveEvent(code, host, sessions) {
   const choice = s.game.event.choices[0].id;
   for (const session of sessions) {
     const ps = await state(code, session);
-    if (ps.self.active) await action(code, session, "event_vote", { choiceId: choice });
+    if (ps.game.event.canVote) await action(code, session, "event_vote", { choiceId: choice });
   }
   await action(code, host, "resolve_event");
 }
@@ -111,8 +111,9 @@ async function voteJudgement(code, host, sessions, targetId = "__skip__") {
   assert.equal(outsideState.self.privateCharacter.outsideActionUsedRound, 2);
   assert.equal(outsideState.game.outsideCamp.proposal.status, "pending");
 
+  const nonHostDecision = await action(host.code, sessions[2], "outside_deal_vote", { choice: "accept" }, true);
+  assert(!nonHostDecision.response.ok && /хост/i.test(nonHostDecision.payload.error || ""));
   await action(host.code, host, "outside_deal_vote", { choice: "accept" });
-  await action(host.code, sessions[2], "outside_deal_vote", { choice: "accept" });
   outsideState = await state(host.code, sessions[1]);
   assert.equal(outsideState.game.outsideCamp.proposal.status, "accepted");
   assert(outsideState.game.outsideCamp.trust >= 10);
@@ -148,7 +149,7 @@ async function voteJudgement(code, host, sessions, targetId = "__skip__") {
 
   await stop();
   fs.rmSync(dataDir, { recursive: true, force: true });
-  console.log("1.2.0: зовнішній табір, ресурси, угоди, дії та окремий фінал перевірені.");
+  console.log("1.2.10: зовнішній табір, ресурси, угоди, дії та окремий фінал перевірені.");
 })().catch(async (error) => {
   console.error(error);
   await stop();

@@ -4,7 +4,7 @@ if (-not (Get-Command node.exe -ErrorAction SilentlyContinue)) {
   Read-Host "Enter"
   exit 1
 }
-Write-Host "СХОВИЩЕ 1.0.5 — постійний сервер" -ForegroundColor Yellow
+Write-Host "СХОВИЩЕ 1.2.10 — постійний сервер" -ForegroundColor Yellow
 while ($true) {
   & node.exe "$PSScriptRoot\server.js"
   $code = $LASTEXITCODE

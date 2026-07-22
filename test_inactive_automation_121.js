@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { stopChildProcess, testServerEnv } = require("./test_support");
 
 const root = __dirname;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "bunker-automation-"));
@@ -31,7 +32,7 @@ async function action(code, session, name, extra = {}, expectError = false) {
 async function state(code, session) {
   return api(`/api/rooms/${code}/state?playerId=${session.playerId}&token=${session.token}`);
 }
-async function createRoom(automationMode, inactivityTimeoutSeconds = 5, phaseTimeoutSeconds = 5) {
+async function createRoom(automationMode, inactivityTimeoutSeconds = 1, phaseTimeoutSeconds = 1) {
   const host = await api("/api/rooms/create", "POST", {
     name: `Host-${automationMode}`,
     mode: "classic",
@@ -64,8 +65,7 @@ async function waitFor(code, session, predicate, timeoutMs = 12000) {
   throw new Error(`waitFor timeout; last phase=${last?.game?.phase}`);
 }
 async function stop() {
-  if (!child || child.killed) return;
-  await new Promise((resolve) => { child.once("exit", resolve); child.kill("SIGTERM"); setTimeout(resolve, 1500); });
+  await stopChildProcess(child);
 }
 
 (async () => {
@@ -78,16 +78,16 @@ async function stop() {
   assert(app.includes("hostAutomationStatus"));
   assert(html.includes('id="hostAutomationPanel"'));
 
-  child = spawn(process.execPath, ["server.js"], { cwd: root, env: { ...process.env, DATA_DIR: dataDir, PORT: String(port), HOST: "127.0.0.1" }, stdio: ["ignore", "ignore", "pipe"] });
+  child = spawn(process.execPath, ["server.js"], { cwd: root, env: testServerEnv({ DATA_DIR: dataDir, PORT: String(port), HOST: "127.0.0.1" }), stdio: ["ignore", "ignore", "pipe"] });
   child.stderr.on("data", (chunk) => process.stderr.write(chunk));
   await ready();
 
   // Допоміжний режим: відсутні нейтралізуються, але фаза не переходить автоматично.
-  const assist = await createRoom("assist", 5, 5);
+  const assist = await createRoom("assist", 1, 1);
   let assistHostState = await state(assist.host.code, assist.host);
   const hostKey = Object.keys(assistHostState.self.privateCharacter.values).find((key) => !assistHostState.self.privateCharacter.revealed[key]);
   await action(assist.host.code, assist.host, "reveal", { key: hostKey });
-  await sleep(6200);
+  await sleep(1350);
   assistHostState = await state(assist.host.code, assist.host);
   assert.equal(assistHostState.game.phase, "reveal", "Допоміжний режим не повинен сам переходити між фазами");
   assert.equal(assistHostState.game.automation.mode, "assist");
@@ -102,7 +102,7 @@ async function stop() {
   assert.equal(resumed.self.privateCharacter.automationControlled, false, "У новій фазі ручний контроль має відновитися");
 
   // Хост може вручну нейтралізувати всі невиконані обов'язкові дії навіть у ручному режимі.
-  const manual = await createRoom("off", 5, 5);
+  const manual = await createRoom("off", 1, 1);
   await action(manual.host.code, manual.host, "resolve_inactive", { allPending: true });
   let manualState = await state(manual.host.code, manual.host);
   assert.equal(manualState.game.hostDashboard.pending, 0);
@@ -111,23 +111,23 @@ async function stop() {
   assert.equal((await state(manual.host.code, manual.host)).game.phase, "discussion");
 
   // Повний автоматичний режим: прострочена фаза нейтралізується і переходить далі.
-  const automatic = await createRoom("auto", 5, 5);
-  const afterReveal = await waitFor(automatic.host.code, automatic.host, (s) => s.game.phase === "discussion", 10000);
+  const automatic = await createRoom("auto", 1, 1);
+  const afterReveal = await waitFor(automatic.host.code, automatic.host, (s) => s.game.phase === "discussion", 5000);
   assert.equal(afterReveal.game.automation.mode, "auto");
   assert(afterReveal.game.automation.history.some((item) => /пропуск розкриття/.test(item.action)));
-  const afterDiscussion = await waitFor(automatic.host.code, automatic.host, (s) => s.game.phase === "event", 10000);
+  const afterDiscussion = await waitFor(automatic.host.code, automatic.host, (s) => s.game.phase === "event", 5000);
   assert(afterDiscussion.game.event && !afterDiscussion.game.event.resolved);
-  const afterEvent = await waitFor(automatic.host.code, automatic.host, (s) => s.game.phase === "elimination", 12000);
+  const afterEvent = await waitFor(automatic.host.code, automatic.host, (s) => s.game.phase === "elimination", 6000);
   assert(afterEvent.game.reasonLog.some((entry) => entry.type === "event"));
-  assert(afterEvent.game.automation.history.some((item) => /утримання під час кризи/.test(item.action)));
+  assert(afterEvent.game.automation.history.some((item) => /нейтральне рішення кризи|утримання під час кризи/.test(item.action)));
 
   // Після автоматичних утримань рішення громади теж не зависає.
-  const afterJudgement = await waitFor(automatic.host.code, automatic.host, (s) => s.game.phase === "round_end", 12000);
+  const afterJudgement = await waitFor(automatic.host.code, automatic.host, (s) => s.game.phase === "round_end", 6000);
   assert(afterJudgement.game.judgement.report || afterJudgement.game.judgementReport || afterJudgement.game.log.some((line) => /санкц/i.test(line)));
 
   await stop();
   fs.rmSync(dataDir, { recursive: true, force: true });
-  console.log("1.2.1: допоміжний режим, нейтральний бот і автоматичне просування фаз перевірені.");
+  console.log("1.2.10: допоміжний режим, нейтральний бот і автоматичне просування фаз перевірені.");
 })().catch(async (error) => {
   console.error(error);
   await stop();

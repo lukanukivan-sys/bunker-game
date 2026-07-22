@@ -1,0 +1,13 @@
+"use strict";
+const fs = require("fs");
+const assert = require("assert");
+const html = fs.readFileSync("public/index.html", "utf8");
+const app = fs.readFileSync("public/app.js", "utf8");
+const css = fs.readFileSync("public/styles.css", "utf8");
+assert(html.includes('id="voteConfirmButton"'));
+assert(html.includes('id="roundEventConfirm"'));
+assert(app.includes("pendingJudgementChoice"));
+assert(app.includes("pendingEventChoiceId"));
+assert(app.includes("publicRevealPreview"));
+assert(css.includes("UI6 stage 6 — council decisions"));
+console.log("✅ UI6 stage 6 council and crisis UI checks passed");

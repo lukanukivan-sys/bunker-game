@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { stopChildProcess } = require("./test_support");
 const { simulateLongTerm } = require("./final_simulation");
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "bunker-demographics-"));
@@ -82,19 +83,25 @@ function fakeRoom(demographicsEnabled, isolation) {
   assert(Object.prototype.hasOwnProperty.call(enabledValues, "demographicContext"));
   assert(!Object.prototype.hasOwnProperty.call(enabledValues, "identity"));
   assert(!Object.prototype.hasOwnProperty.call(enabledValues, "familyStatus"));
-  assert.equal(Object.keys(enabledValues).length, 13);
-  assert(enabled.self.privateCharacter.descriptions.demographicContext.includes("не дає бонусу або штрафу"));
+  assert(Object.prototype.hasOwnProperty.call(enabledValues, "attitudeToChildren"));
+  assert.equal(Object.keys(enabledValues).length, 14);
+  assert(enabled.self.privateCharacter.descriptions.demographicContext.includes("не дає автоматичного бонусу"));
+  assert(enabled.self.privateCharacter.descriptions.attitudeToChildren.includes("демографічні рішення громади"));
 
   const disabled = await makeGame(false);
   const disabledValues = disabled.self.privateCharacter.values;
   assert.equal(disabled.settings.demographicsEnabled, false);
   assert(!Object.prototype.hasOwnProperty.call(disabledValues, "demographicContext"));
+  assert(!Object.prototype.hasOwnProperty.call(disabledValues, "attitudeToChildren"));
   assert(!Object.prototype.hasOwnProperty.call(disabled.self.privateCharacter.descriptions, "demographicContext"));
+  assert(!Object.prototype.hasOwnProperty.call(disabled.self.privateCharacter.descriptions, "attitudeToChildren"));
   assert(!Object.prototype.hasOwnProperty.call(disabled.game.characterLabels, "demographicContext"));
+  assert(!Object.prototype.hasOwnProperty.call(disabled.game.characterLabels, "attitudeToChildren"));
   assert.equal(Object.keys(disabledValues).length, 12);
   assert(!disabled.self.privateCharacter.revealStrategy.sensitiveKeys.includes("demographicContext"));
+  assert(!disabled.self.privateCharacter.revealStrategy.sensitiveKeys.includes("attitudeToChildren"));
 
-  const filteredCustom = await makeGame(false, "custom", ["demographicContext", "origin", "profession", "health"]);
+  const filteredCustom = await makeGame(false, "custom", ["demographicContext", "attitudeToChildren", "origin", "profession", "health"]);
   assert.equal(filteredCustom.settings.characterSetMode, "compact");
   assert(!Object.prototype.hasOwnProperty.call(filteredCustom.self.privateCharacter.values, "demographicContext"));
 
@@ -116,12 +123,12 @@ function fakeRoom(demographicsEnabled, isolation) {
   assert.equal(longHorizon.demography.modeled, true);
   assert.equal(longHorizon.demography.directScoreImpact, 0);
 
-  await new Promise((resolve) => { child.once("exit", resolve); child.kill("SIGTERM"); setTimeout(resolve, 1500); });
+  await stopChildProcess(child);
   fs.rmSync(dataDir, { recursive: true, force: true });
   console.log("Демографічний блок, повне вимкнення та довгострокове моделювання перевірено.");
 })().catch(async (error) => {
   console.error(error);
-  if (child && !child.killed) await new Promise((resolve) => { child.once("exit", resolve); child.kill("SIGTERM"); setTimeout(resolve, 1500); });
+  if (child && !child.killed) await stopChildProcess(child);
   fs.rmSync(dataDir, { recursive: true, force: true });
   process.exit(1);
 });

@@ -4,26 +4,27 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { stopChildProcess, testServerEnv } = require("./test_support");
 
 const root = __dirname;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "shelter-stage17-"));
-const port = 34122;
+const port = 37000 + Math.floor(Math.random() * 1000);
 const base = `http://127.0.0.1:${port}`;
 const child = spawn(process.execPath, [path.join(root, "server.js")], {
   cwd: root,
-  env: { ...process.env, PORT: String(port), HOST: "127.0.0.1", DATA_DIR: dataDir },
+  env: testServerEnv({ PORT: String(port), HOST: "127.0.0.1", DATA_DIR: dataDir }),
   stdio: ["ignore", "pipe", "pipe"]
 });
 let output = "";
 child.stdout.on("data", (chunk) => { output += chunk; });
-child.stderr.on("data", (chunk) => { output += chunk; });
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function request(route, options = {}) {
   const response = await fetch(`${base}${route}`, {
     method: options.method || "GET",
     headers: options.body ? { "content-type": "application/json" } : undefined,
-    body: options.body ? JSON.stringify(options.body) : undefined
+    body: options.body ? JSON.stringify(options.body) : undefined,
+    signal: AbortSignal.timeout(5000)
   });
   const payload = await response.json().catch(() => ({}));
   return { response, payload };
@@ -53,7 +54,7 @@ async function waitForServer() {
 (async () => {
   try {
     await waitForServer();
-    const created = await ok("/api/rooms/create", { method: "POST", body: { name: "Host", mode: "classic", setting: "modern", capacity: 2, rounds: 3, hostFailoverEnabled: true, hostFailoverSeconds: 15 } });
+    const created = await ok("/api/rooms/create", { method: "POST", body: { name: "Host", mode: "classic", setting: "modern", capacity: 2, rounds: 3, hostFailoverEnabled: true, hostFailoverSeconds: 1 } });
     assert.match(created.recoveryCode, /^[A-Z0-9]{10}$/);
     const host = { code: created.code, playerId: created.playerId, token: created.token, recoveryCode: created.recoveryCode };
     const joined = await ok("/api/rooms/join", { method: "POST", body: { name: "Guest", code: host.code } });
@@ -99,15 +100,16 @@ async function waitForServer() {
     const oldCodeAttempt = await request("/api/rooms/rejoin", { method: "POST", body: { code: host.code, recoveryCode: beforeRegenerate } });
     assert.equal(oldCodeAttempt.response.status, 401);
 
+
     // Automatic failover in a fresh room. Keep candidate online, let host disappear.
-    const autoCreated = await ok("/api/rooms/create", { method: "POST", body: { name: "AutoHost", mode: "classic", setting: "modern", capacity: 2, rounds: 3, hostFailoverEnabled: true, hostFailoverSeconds: 15 } });
+    const autoCreated = await ok("/api/rooms/create", { method: "POST", body: { name: "AutoHost", mode: "classic", setting: "modern", capacity: 2, rounds: 3, hostFailoverEnabled: true, hostFailoverSeconds: 1 } });
     const autoHost = { code: autoCreated.code, playerId: autoCreated.playerId, token: autoCreated.token };
     const autoJoin = await ok("/api/rooms/join", { method: "POST", body: { name: "Backup", code: autoHost.code } });
     const backup = { code: autoHost.code, playerId: autoJoin.playerId, token: autoJoin.token };
     const started = Date.now();
     let backupState = await state(backup);
-    while (!backupState.self.isHost && Date.now() - started < 22000) {
-      await sleep(2500);
+    while (!backupState.self.isHost && Date.now() - started < 5000) {
+      await sleep(250);
       backupState = await state(backup);
     }
     assert.equal(backupState.self.isHost, true, "automatic host failover did not occur");
@@ -115,8 +117,7 @@ async function waitForServer() {
 
     console.log("✅ Stage 17 host transfer and recovery tests passed");
   } finally {
-    child.kill("SIGTERM");
-    await sleep(200);
+    await stopChildProcess(child);
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
 })().catch((error) => {

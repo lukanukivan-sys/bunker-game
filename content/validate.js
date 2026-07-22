@@ -107,6 +107,7 @@ function validateContent(content) {
     assertUnique(events, `EVENTS.${setting}`, (event) => event.id);
     for (const event of events) {
       assert(event.id && event.title && event.description, `EVENTS.${setting}: неповна подія.`);
+      if (event.level != null) assert(VALID_LEVELS.has(event.level), `EVENTS.${setting}.${event.id}: невідомий level «${event.level}».`);
       assert(Array.isArray(event.choices) && event.choices.length >= 2, `Подія ${event.id} має замало варіантів.`);
       assertUnique(event.choices, `EVENTS.${setting}.${event.id}.choices`, (choice) => choice.id);
       for (const choice of event.choices) {
@@ -122,10 +123,18 @@ function validateContent(content) {
     assertUnique(expeditions, `EXPEDITIONS.${setting}`, (expedition) => expedition.id);
     for (const expedition of expeditions) {
       assert(expedition.id && expedition.name && expedition.description, `EXPEDITIONS.${setting}: неповна експедиція.`);
+      if (expedition.level != null) assert(VALID_LEVELS.has(expedition.level), `EXPEDITIONS.${setting}.${expedition.id}: невідомий level «${expedition.level}».`);
       assert(Array.isArray(expedition.tags), `Експедиція ${expedition.id} не має тегів.`);
       assert(Number.isFinite(expedition.difficulty) && expedition.difficulty >= 1 && expedition.difficulty <= 6, `Експедиція ${expedition.id} має складність поза межами 1–6.`);
       validateEffects(expedition.success, `EXPEDITIONS.${setting}.${expedition.id}.success`);
       validateEffects(expedition.failure, `EXPEDITIONS.${setting}.${expedition.id}.failure`);
+    }
+    if (setting !== "modern") assert(data.catastrophes.length >= 20, `${setting}: після етапу 23 потрібно щонайменше 20 катастроф.`);
+    if (["postapocalypse", "cyberpunk", "horror", "detective"].includes(setting)) {
+      assert(events.length >= 25, `${setting}: після етапу 23 потрібно щонайменше 25 подій.`);
+      assert(expeditions.length >= 30, `${setting}: після етапу 23 потрібно щонайменше 30 експедицій.`);
+      const chaosCount = events.filter((item) => item.level === "absurd").length + expeditions.filter((item) => item.level === "absurd").length;
+      assert(chaosCount >= 8, `${setting}: замало контенту для рівня «Повний хаос».`);
     }
   }
 

@@ -3,11 +3,32 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { summarizeCarryover } = require("./content/campaign_legacy");
+const { analyzePack: analyzeContentPack } = require("./content/pack_analyzer");
+const { PLATFORM_SCHEMA } = require("./config/version");
 
 function uid(prefix = "id") {
   return `${prefix}_${crypto.randomBytes(8).toString("hex")}`;
 }
 function token() { return crypto.randomBytes(24).toString("hex"); }
+function recoveryCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = crypto.randomBytes(15);
+  const raw = [...bytes].map((value) => alphabet[value % alphabet.length]).join("");
+  return `${raw.slice(0, 5)}-${raw.slice(5, 10)}-${raw.slice(10, 15)}`;
+}
+function normalizeRecoveryCode(value) { return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, ""); }
+function assertStrongPassword(password) {
+  const value = String(password || "");
+  const classes = [/[a-zа-яіїєґ]/u, /[A-ZА-ЯІЇЄҐ]/u, /\d/u, /[^\p{L}\p{N}]/u].filter((pattern) => pattern.test(value)).length;
+  if (value.length < 10) throw new Error("Пароль має містити щонайменше 10 символів.");
+  if (value.length < 14 && classes < 3) throw new Error("Пароль до 14 символів має містити щонайменше три типи знаків: великі й малі літери, цифри або спецсимволи.");
+  return value;
+}
+function newSession(rawToken, meta = {}) {
+  return { id: uid("session"), tokenHash: authTokenHash(rawToken), createdAt: Date.now(), lastSeenAt: Date.now(), label: safeName(meta.label, 80) || "Пристрій", ipHint: safeName(meta.ipHint, 80) || null };
+}
+
 function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
 function safeName(value, max = 64) { return String(value || "").trim().slice(0, max); }
 function normalizeUsername(value) { return safeName(value, 32).toLocaleLowerCase("uk").replace(/\s+/g, "_"); }
@@ -120,6 +141,7 @@ function validatePack(input, ownerAccountId = null, existingId = null) {
     ownerAccountId,
     name,
     description: safeName(input?.description, 300),
+    compatibility: ["compatible", "experimental", "cosmetic"].includes(input?.compatibility) ? input.compatibility : null,
     setting,
     public: Boolean(input?.public),
     entries,
@@ -139,15 +161,29 @@ function createPlatform(baseDir, dataDirOverride = null) {
   };
   const accounts = new Map((readJson(files.accounts, []) || []).map((item) => {
     if (!item.authTokenHash && item.authToken) item.authTokenHash = authTokenHash(item.authToken);
+    item.sessions = Array.isArray(item.sessions) ? item.sessions : [];
+    if (item.authTokenHash) item.sessions.push({ id: uid("legacy_session"), tokenHash: item.authTokenHash, createdAt: item.lastSeenAt || item.createdAt || Date.now(), lastSeenAt: item.lastSeenAt || Date.now(), label: "Старий сеанс" });
+    item.sessions = item.sessions.filter((session) => session?.tokenHash).slice(-8);
+    item.recoveryCodeHash ||= null;
     delete item.authToken;
+    delete item.authTokenHash;
     return [item.id, item];
   }));
-  const campaigns = new Map((readJson(files.campaigns, []) || []).map((item) => [item.id, item]));
+  const campaigns = new Map((readJson(files.campaigns, []) || []).map((item) => {
+    item.chapters = Array.isArray(item.chapters) ? item.chapters : [];
+    item.carryover ||= { version: 2, sourceChapter: null, resources: {}, allies: 0, legacy: [] };
+    item.carryover.version ||= 1;
+    item.carryover.resources ||= {};
+    item.carryover.legacy = Array.isArray(item.carryover.legacy) ? item.carryover.legacy : [];
+    return [item.id, item];
+  }));
   const packs = new Map((readJson(files.packs, []) || []).map((item) => [item.id, item]));
   const globalStats = readJson(files.stats, {
     games: 0, totalScore: 0, bestScore: 0, settings: {}, modes: {},
     players: 0, births: 0, deaths: 0, startedAt: Date.now(), recentGames: []
   });
+  const failedLogins = new Map();
+  const MAX_SESSIONS = 8;
 
   let saveTimer = null;
   function saveAllNow() {
@@ -178,8 +214,12 @@ function createPlatform(baseDir, dataDirOverride = null) {
   }
   function authenticate(accountId, authToken) {
     const account = accounts.get(String(accountId || ""));
-    if (!account || !authToken || !account.authTokenHash || !compareHex(account.authTokenHash, authTokenHash(authToken))) return null;
-    account.lastSeenAt = Date.now();
+    if (!account || !authToken) return null;
+    const hash = authTokenHash(authToken);
+    const session = (account.sessions || []).find((item) => compareHex(item.tokenHash, hash));
+    if (!session) return null;
+    session.lastSeenAt = Date.now();
+    account.lastSeenAt = session.lastSeenAt;
     return account;
   }
   function publicAccount(account) {
@@ -187,6 +227,7 @@ function createPlatform(baseDir, dataDirOverride = null) {
     return {
       id: account.id, username: account.username, displayName: account.displayName,
       createdAt: account.createdAt, stats: publicStats(account.stats),
+      sessionCount: (account.sessions || []).length, platformSchema: PLATFORM_SCHEMA,
       campaignCount: [...campaigns.values()].filter((item) => item.ownerAccountId === account.id).length,
       packCount: [...packs.values()].filter((item) => item.ownerAccountId === account.id).length
     };
@@ -194,19 +235,20 @@ function createPlatform(baseDir, dataDirOverride = null) {
   function register(body) {
     const username = normalizeUsername(body?.username);
     const displayName = safeName(body?.displayName || body?.username, 32);
-    const password = String(body?.password || "");
+    const password = assertStrongPassword(body?.password);
     if (!/^[\p{L}\p{N}_.-]{3,32}$/u.test(username)) throw new Error("Логін має містити 3–32 літери, цифри або символи _ . -");
-    if (password.length < 6) throw new Error("Пароль має містити щонайменше 6 символів.");
     if (accountsHasUsername(username)) throw new Error("Такий логін уже існує.");
     const salt = crypto.randomBytes(16).toString("hex");
     const rawToken = token();
+    const rawRecoveryCode = recoveryCode();
     const account = {
       id: uid("account"), username, displayName, salt, passwordHash: passwordHash(password, salt),
-      authTokenHash: authTokenHash(rawToken), createdAt: Date.now(), lastSeenAt: Date.now(),
+      sessions: [newSession(rawToken, body?.session || {})], recoveryCodeHash: authTokenHash(normalizeRecoveryCode(rawRecoveryCode)),
+      createdAt: Date.now(), lastSeenAt: Date.now(),
       stats: { games: 0, survived: 0, successfulSettlements: 0, totalScore: 0, bestScore: 0, treatments: 0, expeditions: 0, repairs: 0, settings: {}, modes: {} }
     };
     accounts.set(account.id, account); saveSoon();
-    return { account: publicAccount(account), accountId: account.id, token: rawToken };
+    return { account: publicAccount(account), accountId: account.id, token: rawToken, recoveryCode: rawRecoveryCode };
   }
   function accountsHasUsername(username) {
     return [...accounts.values()].some((item) => item.username === username);
@@ -214,28 +256,79 @@ function createPlatform(baseDir, dataDirOverride = null) {
   function login(body) {
     const username = normalizeUsername(body?.username);
     const password = String(body?.password || "");
+    const now = Date.now();
+    const attempt = failedLogins.get(username) || { count: 0, blockedUntil: 0 };
+    if (attempt.blockedUntil > now) {
+      const seconds = Math.ceil((attempt.blockedUntil - now) / 1000);
+      const error = new Error(`Забагато невдалих входів. Повторіть через ${seconds} с.`);
+      error.status = 429;
+      throw error;
+    }
     const account = [...accounts.values()].find((item) => item.username === username);
-    if (!account || !compareHex(account.passwordHash, passwordHash(password, account.salt))) throw new Error("Неправильний логін або пароль.");
+    if (!account || !compareHex(account.passwordHash, passwordHash(password, account.salt))) {
+      attempt.count += 1;
+      attempt.blockedUntil = attempt.count >= 5 ? now + Math.min(15 * 60_000, 30_000 * 2 ** Math.min(4, attempt.count - 5)) : 0;
+      failedLogins.set(username, attempt);
+      throw new Error("Неправильний логін або пароль.");
+    }
+    failedLogins.delete(username);
     const rawToken = token();
-    account.authTokenHash = authTokenHash(rawToken); account.lastSeenAt = Date.now(); saveSoon();
+    account.sessions ||= [];
+    account.sessions.push(newSession(rawToken, body?.session || {}));
+    account.sessions = account.sessions.sort((a, b) => Number(b.lastSeenAt || 0) - Number(a.lastSeenAt || 0)).slice(0, MAX_SESSIONS);
+    account.lastSeenAt = now; saveSoon();
     return { account: publicAccount(account), accountId: account.id, token: rawToken };
+  }
+  function resetPassword(body) {
+    const username = normalizeUsername(body?.username);
+    const suppliedRecovery = normalizeRecoveryCode(body?.recoveryCode);
+    const password = assertStrongPassword(body?.newPassword);
+    const account = [...accounts.values()].find((item) => item.username === username);
+    if (!account || !suppliedRecovery || !account.recoveryCodeHash || !compareHex(account.recoveryCodeHash, authTokenHash(suppliedRecovery))) throw new Error("Неправильний логін або резервний код.");
+    const salt = crypto.randomBytes(16).toString("hex");
+    const rawToken = token();
+    const rawRecoveryCode = recoveryCode();
+    account.salt = salt;
+    account.passwordHash = passwordHash(password, salt);
+    account.sessions = [newSession(rawToken, body?.session || {})];
+    account.recoveryCodeHash = authTokenHash(normalizeRecoveryCode(rawRecoveryCode));
+    account.lastSeenAt = Date.now();
+    saveSoon();
+    return { account: publicAccount(account), accountId: account.id, token: rawToken, recoveryCode: rawRecoveryCode };
+  }
+  function listSessions(account, currentToken) {
+    const currentHash = authTokenHash(currentToken);
+    return (account.sessions || []).map((session) => ({ id: session.id, createdAt: session.createdAt, lastSeenAt: session.lastSeenAt, label: session.label || "Пристрій", ipHint: session.ipHint || null, current: compareHex(session.tokenHash, currentHash) })).sort((a, b) => Number(b.lastSeenAt || 0) - Number(a.lastSeenAt || 0));
+  }
+  function revokeSession(account, sessionId, currentToken) {
+    const before = (account.sessions || []).length;
+    account.sessions = (account.sessions || []).filter((session) => session.id !== String(sessionId || ""));
+    if (account.sessions.length === before) throw new Error("Сеанс не знайдено.");
+    saveSoon();
+    return { sessions: listSessions(account, currentToken) };
   }
   function createCampaign(account, body) {
     const campaign = {
       id: uid("campaign"), ownerAccountId: account.id, name: safeName(body?.name, 80) || "Нова кампанія",
       description: safeName(body?.description, 300), setting: safeName(body?.setting, 32) || "modern",
       createdAt: Date.now(), updatedAt: Date.now(), archived: false, chapters: [],
-      carryover: { resources: {}, morale: 0, allies: 0, legacy: [] }
+      carryover: { version: 2, sourceChapter: null, resources: {}, allies: 0, legacy: [] }
     };
     campaigns.set(campaign.id, campaign); saveSoon(); return campaign;
   }
   function listCampaigns(account) {
-    return [...campaigns.values()].filter((item) => item.ownerAccountId === account.id).sort((a, b) => b.updatedAt - a.updatedAt);
+    return [...campaigns.values()]
+      .filter((item) => item.ownerAccountId === account.id)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .map((item) => ({ ...item, carryoverSummary: summarizeCarryover(item.carryover || {}) }));
   }
   function getCampaign(id) { return campaigns.get(String(id || "")) || null; }
   function campaignForRoom(account, id) {
     const campaign = getCampaign(id);
     return campaign && account && campaign.ownerAccountId === account.id && !campaign.archived ? campaign : null;
+  }
+  function analyzePack(body, options = {}) {
+    return analyzeContentPack(body?.pack || body || {}, options);
   }
   function createPack(account, body) {
     const pack = validatePack(body, account.id);
@@ -308,14 +401,21 @@ function createPlatform(baseDir, dataDirOverride = null) {
         survivors: (final.survivors || []).map((item) => item.name),
         population: simulation.demography?.endPopulation || final.survivors?.length || 0,
         settlement: simulation.settlement?.stage || "Сховище",
-        chronicle: (simulation.chronicle || []).slice(-8)
+        chronicle: (simulation.chronicle || []).slice(-8),
+        legacyOutcome: room.game.campaignLegacy?.dilemma ? {
+          title: room.game.campaignLegacy.dilemma.title,
+          optionId: room.game.campaignLegacy.dilemma.resolvedOptionId || null,
+          resultText: room.game.campaignLegacy.dilemma.resultText || "Дилему не було завершено.",
+          automatic: Boolean(room.game.campaignLegacy.dilemma.automatic)
+        } : null
       });
       const resources = simulation.finalResources || final.catastrophe?.resources || room.game.shelter?.resources || {};
       campaign.carryover = {
-        resources: Object.fromEntries(Object.entries(resources).filter(([key]) => key !== "morale").map(([key, value]) => [key, clamp(Math.round((Number(value) - 50) / 12), -4, 8)])),
-        morale: clamp(Math.round((Number(resources.morale || 50) - 50) / 10), -4, 6),
-        allies: clamp(Number(room.game.shelter?.allies || 0), 0, 6),
-        legacy: (simulation.settlement?.buildings || []).slice(-4).map((item) => typeof item === "string" ? item : item.name)
+        version: 2,
+        sourceChapter: campaign.chapters.length,
+        resources: Object.fromEntries(Object.entries(resources).map(([key, value]) => [key, clamp(Math.round((Number(value) - 50) / 15), -4, 6)])),
+        allies: clamp(Number(room.game.shelter?.allies || 0), 0, 3),
+        legacy: (simulation.settlement?.buildings || []).slice(-2).map((item) => typeof item === "string" ? item : item.name)
       };
       campaign.updatedAt = Date.now();
     }
@@ -332,11 +432,11 @@ function createPlatform(baseDir, dataDirOverride = null) {
 
   backup("startup");
   return {
-    authenticate, publicAccount, register, login, saveSoon, saveAllNow, backup,
+    authenticate, publicAccount, register, login, resetPassword, listSessions, revokeSession, saveSoon, saveAllNow, backup,
     createCampaign, listCampaigns, getCampaign, campaignForRoom,
-    createPack, updatePack, deletePack, importPack, listPacks, getPack, packForRoom,
+    createPack, updatePack, deletePack, importPack, listPacks, getPack, packForRoom, analyzePack,
     recordGame, publicGlobalStats, validatePack
   };
 }
 
-module.exports = { createPlatform, validatePack, ENTRY_CATEGORIES, ADVANCED_CATEGORIES };
+module.exports = { createPlatform, validatePack, ENTRY_CATEGORIES, ADVANCED_CATEGORIES, analyzeContentPack };
