@@ -5,7 +5,8 @@
   "description": "Мережева браузерна гра СХОВИЩЕ",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "preflight:data": "node scripts/platform_data_preflight.js",
+    "start": "npm run preflight:data && node server.js",
     "test": "node run_all_tests.js",
     "test:smoke": "node --require ./test_runtime_setup.js test_api_v1.js",
     "test:network": "node --require ./test_runtime_setup.js test_network_load_123.js",
@@ -13,7 +14,7 @@
     "audit:content": "node scripts/content_editorial_audit.js",
     "audit:abilities": "node scripts/ability_balance_audit.js",
     "audit": "npm run audit:content && npm run audit:abilities",
-    "check:syntax": "node --check server.js && node --check platform.js && node --check lib/room_store.js",
+    "check:syntax": "node --check server.js && node --check platform.js && node --check lib/room_store.js && node --check scripts/platform_data_preflight.js",
     "verify": "npm test && npm run audit && npm run check:syntax"
   },
   "engines": {
