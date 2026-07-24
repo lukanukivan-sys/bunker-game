@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const { summarizeCarryover } = require("./content/campaign_legacy");
 const { analyzePack: analyzeContentPack } = require("./content/pack_analyzer");
 const { PLATFORM_SCHEMA } = require("./config/version");
+const { cloneReport, loadPlatformStores } = require("./lib/platform_store_loader");
 
 function uid(prefix = "id") {
   return `${prefix}_${crypto.randomBytes(8).toString("hex")}`;
@@ -37,10 +38,6 @@ function atomicWrite(file, value) {
   const temp = `${file}.tmp`;
   fs.writeFileSync(temp, JSON.stringify(value, null, 2), "utf8");
   fs.renameSync(temp, file);
-}
-function readJson(file, fallback) {
-  try { return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : fallback; }
-  catch { return fallback; }
 }
 function passwordHash(password, salt) {
   return crypto.scryptSync(String(password), salt, 64).toString("hex");
@@ -159,7 +156,9 @@ function createPlatform(baseDir, dataDirOverride = null) {
     packs: path.join(dataDir, "content_packs_v1.json"),
     stats: path.join(dataDir, "statistics_v1.json")
   };
-  const accounts = new Map((readJson(files.accounts, []) || []).map((item) => {
+  const loadedStores = loadPlatformStores(dataDir);
+  const loadReport = loadedStores.report;
+  const accounts = new Map(loadedStores.accounts.map((item) => {
     if (!item.authTokenHash && item.authToken) item.authTokenHash = authTokenHash(item.authToken);
     item.sessions = Array.isArray(item.sessions) ? item.sessions : [];
     if (item.authTokenHash) item.sessions.push({ id: uid("legacy_session"), tokenHash: item.authTokenHash, createdAt: item.lastSeenAt || item.createdAt || Date.now(), lastSeenAt: item.lastSeenAt || Date.now(), label: "Старий сеанс" });
@@ -169,19 +168,20 @@ function createPlatform(baseDir, dataDirOverride = null) {
     delete item.authTokenHash;
     return [item.id, item];
   }));
-  const campaigns = new Map((readJson(files.campaigns, []) || []).map((item) => {
+  const campaigns = new Map(loadedStores.campaigns.map((item) => {
     item.chapters = Array.isArray(item.chapters) ? item.chapters : [];
-    item.carryover ||= { version: 2, sourceChapter: null, resources: {}, allies: 0, legacy: [] };
+    item.carryover = item.carryover && typeof item.carryover === "object" && !Array.isArray(item.carryover)
+      ? item.carryover
+      : { version: 2, sourceChapter: null, resources: {}, allies: 0, legacy: [] };
     item.carryover.version ||= 1;
-    item.carryover.resources ||= {};
+    item.carryover.resources = item.carryover.resources && typeof item.carryover.resources === "object" && !Array.isArray(item.carryover.resources)
+      ? item.carryover.resources
+      : {};
     item.carryover.legacy = Array.isArray(item.carryover.legacy) ? item.carryover.legacy : [];
     return [item.id, item];
   }));
-  const packs = new Map((readJson(files.packs, []) || []).map((item) => [item.id, item]));
-  const globalStats = readJson(files.stats, {
-    games: 0, totalScore: 0, bestScore: 0, settings: {}, modes: {},
-    players: 0, births: 0, deaths: 0, startedAt: Date.now(), recentGames: []
-  });
+  const packs = new Map(loadedStores.packs.map((item) => [item.id, item]));
+  const globalStats = loadedStores.stats;
   const failedLogins = new Map();
   const MAX_SESSIONS = 8;
 
@@ -421,6 +421,9 @@ function createPlatform(baseDir, dataDirOverride = null) {
     }
     saveSoon();
   }
+  function getLoadReport() {
+    return cloneReport(loadReport);
+  }
   function publicGlobalStats() {
     const games = Number(globalStats.games || 0);
     return {
@@ -435,7 +438,7 @@ function createPlatform(baseDir, dataDirOverride = null) {
     authenticate, publicAccount, register, login, resetPassword, listSessions, revokeSession, saveSoon, saveAllNow, backup,
     createCampaign, listCampaigns, getCampaign, campaignForRoom,
     createPack, updatePack, deletePack, importPack, listPacks, getPack, packForRoom, analyzePack,
-    recordGame, publicGlobalStats, validatePack
+    recordGame, publicGlobalStats, getLoadReport, validatePack
   };
 }
 
