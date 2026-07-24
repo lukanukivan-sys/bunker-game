@@ -33,10 +33,24 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        run: npm test
+        shell: bash
+        run: |
+          if npm test > test-output.log 2>&1; then
+            tail -n 30 test-output.log
+          else
+            tail -n 140 test-output.log
+            exit 1
+          fi
 
       - name: Audit content and abilities
-        run: npm run audit
+        shell: bash
+        run: |
+          if npm run audit > audit-output.log 2>&1; then
+            tail -n 40 audit-output.log
+          else
+            tail -n 120 audit-output.log
+            exit 1
+          fi
 
       - name: Check syntax
         run: npm run check:syntax
