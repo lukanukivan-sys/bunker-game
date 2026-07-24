@@ -6,6 +6,7 @@ const path = require("path");
 const { spawn } = require("child_process");
 const { stopChildProcess } = require("./test_support");
 const { describeCharacteristic } = require("./content/character_descriptions");
+const { PRODUCT_VERSION } = require("./config/version");
 
 assert(describeCharacteristic("demographicContext", "Інтерсекс • Небінарна особа").includes("Стать та ідентичність"));
 assert(describeCharacteristic("demographicContext", "Інтерсекс • Небінарна особа").includes("не дає автоматичного бонусу"));
@@ -30,10 +31,10 @@ async function api(route, method = "GET", body = null) {
 }
 async function ready() {
   for (let i = 0; i < 60; i += 1) {
-    try { if ((await api("/api/health")).version === "1.2.10") return; } catch {}
+    try { if ((await api("/api/health")).version === PRODUCT_VERSION) return; } catch {}
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw new Error("Сервер 1.2.10 не запустився.");
+  throw new Error(`Сервер ${PRODUCT_VERSION} не запустився.`);
 }
 async function action(code, session, actionName, extra = {}) {
   return api(`/api/rooms/${code}/action`, "POST", { playerId: session.playerId, token: session.token, action: actionName, ...extra });
@@ -96,7 +97,7 @@ async function stop() {
   assert(uiSource.includes("demography.explanation"), "у фіналі немає пояснення народжуваності");
   await stop();
   fs.rmSync(dataDir, { recursive: true, force: true });
-  console.log("1.2.10: місткість, баланс ресурсів, конкретні описи, таймер і метадані подій перевірено.");
+  console.log(`${PRODUCT_VERSION}: місткість, баланс ресурсів, конкретні описи, таймер і метадані подій перевірено.`);
 })().catch(async (error) => {
   console.error(error);
   await stop();
