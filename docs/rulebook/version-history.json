@@ -1,0 +1,42 @@
+{
+  "schema": "rulebook-version-history-v1",
+  "current": {
+    "productVersion": "1.2.11",
+    "rulebookVersion": "0.8.0-rc.1",
+    "manifestSchema": "rulebook-manifest-v1",
+    "runtimeSchema": "rulebook-runtime-v1",
+    "bookMapSchema": "rulebook-book-map-v1",
+    "locale": "uk-UA",
+    "updatedAt": "2026-07-24"
+  },
+  "entries": [
+    {
+      "rulebookVersion": "0.8.0-rc.1",
+      "productVersion": "1.2.11",
+      "date": "2026-07-24",
+      "status": "release-candidate",
+      "summary": "Релізний gate, приймальні сценарії, локальна opt-in діагностика та CI-захист синхронізації правил."
+    },
+    {
+      "rulebookVersion": "0.7.0-offline-security",
+      "productVersion": "1.2.11",
+      "date": "2026-07-24",
+      "status": "release-candidate",
+      "summary": "Версіонування, журнал змін, локальний fallback, безпечний renderer і розширені автоматичні перевірки."
+    },
+    {
+      "rulebookVersion": "0.6.0-validation",
+      "productVersion": "1.2.11",
+      "date": "2026-07-24",
+      "status": "superseded",
+      "summary": "Безповзункова верстка, автоматичне вміщення та релізна валідація."
+    },
+    {
+      "rulebookVersion": "0.5.0-content-accessibility",
+      "productVersion": "1.2.11",
+      "date": "2026-07-24",
+      "status": "superseded",
+      "summary": "Повний вміст, локальні схеми, налаштування читання та доступність."
+    }
+  ]
+}

@@ -20,9 +20,11 @@ child.stdout.on("data", (chunk) => { output += chunk; });
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function request(route, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (options.body) headers["content-type"] = "application/json";
   const response = await fetch(`${base}${route}`, {
     method: options.method || "GET",
-    headers: options.body ? { "content-type": "application/json" } : undefined,
+    headers: Object.keys(headers).length ? headers : undefined,
     body: options.body ? JSON.stringify(options.body) : undefined,
     signal: AbortSignal.timeout(5000)
   });
@@ -85,14 +87,61 @@ async function waitForServer() {
     const guestWithRequest = await state(guest);
     assert.equal(guestWithRequest.sessionManagement.recoveryRequests.length, 1);
     await action(guest, "resolve_recovery_request", { requestId: recoveryRequest.requestId, approve: true });
-    const recoveryStatus = await ok(`/api/rooms/recovery-status?code=${host.code}&requestId=${encodeURIComponent(recoveryRequest.requestId)}&requestToken=${encodeURIComponent(recoveryRequest.requestToken)}`);
+    const recoveryStatus = await ok(`/api/rooms/recovery-status?code=${host.code}&requestId=${encodeURIComponent(recoveryRequest.requestId)}`, {
+      headers: { "x-recovery-request-token": recoveryRequest.requestToken }
+    });
     assert.equal(recoveryStatus.status, "approved");
-    assert.equal(recoveryStatus.playerId, host.playerId);
-    assert.notEqual(recoveryStatus.token, host.token);
-    const restoredHost = { code: host.code, playerId: host.playerId, token: recoveryStatus.token, recoveryCode: recoveryStatus.recoveryCode };
+    assert.equal(recoveryStatus.claimRequired, true);
+    assert.equal(Object.prototype.hasOwnProperty.call(recoveryStatus, "token"), false, "status endpoint must not expose the room token");
+
+    const recoveryClaim = await ok("/api/rooms/recovery-claim", {
+      method: "POST",
+      headers: { "x-recovery-request-token": recoveryRequest.requestToken },
+      body: { code: host.code, requestId: recoveryRequest.requestId }
+    });
+    assert.equal(recoveryClaim.status, "approved");
+    assert.equal(recoveryClaim.playerId, host.playerId);
+    assert.notEqual(recoveryClaim.token, host.token);
+
+    const repeatedClaim = await request("/api/rooms/recovery-claim", {
+      method: "POST",
+      headers: { "x-recovery-request-token": recoveryRequest.requestToken },
+      body: { code: host.code, requestId: recoveryRequest.requestId }
+    });
+    assert.equal(repeatedClaim.response.status, 410, "approved recovery token must be claimable only once");
+    assert.equal(Object.prototype.hasOwnProperty.call(repeatedClaim.payload, "token"), false);
+
+    await sleep(350);
+    const roomSnapshot = JSON.parse(fs.readFileSync(path.join(dataDir, "rooms-v6", `${host.code}.json`), "utf8"));
+    const savedRequest = roomSnapshot.room.recoveryRequests.find((item) => item.id === recoveryRequest.requestId);
+    assert(savedRequest, "recovery request must be persisted");
+    assert.equal(savedRequest.status, "consumed");
+    assert.equal(savedRequest.requestToken, undefined, "raw recovery request secret must not be persisted");
+    assert.match(savedRequest.requestTokenHash, /^[a-f0-9]{64}$/);
+    assert.equal(savedRequest.grantedToken, null, "claimed room token must be erased from the recovery request");
+
+    const restoredHost = { code: host.code, playerId: host.playerId, token: recoveryClaim.token, recoveryCode: recoveryClaim.recoveryCode };
     const invalidatedHost = await request(`/api/rooms/${host.code}/state?playerId=${host.playerId}&token=${host.token}`);
     assert.equal(invalidatedHost.response.status, 401);
     await state(restoredHost);
+
+    const nativeFetch = globalThis.__shelterNativeFetch;
+    assert.equal(typeof nativeFetch, "function");
+    const leakedRoomTokenResponse = await nativeFetch(`${base}/api/rooms/${host.code}/state?playerId=${encodeURIComponent(host.playerId)}&token=${encodeURIComponent(host.token)}`, {
+      headers: { connection: "close" },
+      signal: AbortSignal.timeout(5000)
+    });
+    const leakedRoomTokenPayload = await leakedRoomTokenResponse.json();
+    assert.equal(leakedRoomTokenResponse.status, 400);
+    assert.match(leakedRoomTokenPayload.error, /заголовку X-Player-Token/);
+
+    const leakedRecoveryTokenResponse = await nativeFetch(`${base}/api/rooms/recovery-status?code=${host.code}&requestId=${encodeURIComponent(recoveryRequest.requestId)}&requestToken=${encodeURIComponent(recoveryRequest.requestToken)}`, {
+      headers: { connection: "close" },
+      signal: AbortSignal.timeout(5000)
+    });
+    const leakedRecoveryTokenPayload = await leakedRecoveryTokenResponse.json();
+    assert.equal(leakedRecoveryTokenResponse.status, 400);
+    assert.match(leakedRecoveryTokenPayload.error, /X-Recovery-Request-Token/);
 
     const beforeRegenerate = (await state(restoredHost)).self.recoveryCode;
     const regeneratedState = await action(restoredHost, "regenerate_recovery_code");

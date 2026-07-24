@@ -34,6 +34,7 @@ const AUTO_EVENT_DELAY_MS = IS_TEST_RUNTIME ? 180 : 1800;
 const AUTO_PHASE_DELAY_MS = IS_TEST_RUNTIME ? 80 : 800;
 const requestBuckets = new Map();
 const roomStateWaiters = new Map();
+const playerPresence = new Map();
 const networkMetrics = { requests: 0, limited: 0, stateRequests: 0, longPolls: 0, longPollTimeouts: 0, longPollWakeups: 0 };
 const rooms = new Map();
 const roomStore = createRoomStore({
@@ -1534,11 +1535,23 @@ function ensureGenerationSettings(room) {
   room.settings.generationSchema = room.settings.generationSchema || GENERATION_SCHEMA;
   return room.settings.generationSeed;
 }
-function publicGenerationState(room) {
+function publicGenerationState(room, requester) {
   ensureGenerationSettings(room);
   const gameMeta = room.game?.generation || null;
+  const lobbyHost = !room.game && requester?.id === room.hostPlayerId;
+  const finalReveal = room.game?.phase === "final";
+  const seedVisible = Boolean(lobbyHost || finalReveal);
+  const seedVisibility = finalReveal
+    ? "final"
+    : lobbyHost
+      ? "host-lobby"
+      : room.game
+        ? "hidden-active-game"
+        : "host-only";
   return {
-    seed: room.settings.generationSeed,
+    seed: seedVisible ? room.settings.generationSeed : null,
+    seedVisible,
+    seedVisibility,
     schema: gameMeta?.schema || room.settings.generationSchema || GENERATION_SCHEMA,
     configCode: gameMeta?.configCode || generationConfigCode(room),
     fingerprint: gameMeta?.fingerprint || null,
@@ -1547,7 +1560,11 @@ function publicGenerationState(room) {
     migrated: Boolean(gameMeta?.migrated),
     note: gameMeta?.migrated
       ? "Цей seed призначено вже після створення старої партії; він не відтворює її первинну роздачу."
-      : "Однакові seed, конфігурація, кількість гравців і схема генерації дають однакову стартову партію."
+      : seedVisible
+        ? "Однакові seed, конфігурація, кількість гравців і схема генерації дають однакову стартову партію."
+        : room.game
+          ? "Seed приховано до фіналу, щоб активну роздачу не можна було відтворити під час партії."
+          : "Seed доступний лише хосту до початку партії."
   };
 }
 
@@ -1556,6 +1573,19 @@ function uid(prefix = "id") {
 }
 function token() {
   return crypto.randomBytes(24).toString("hex");
+}
+function secretHash(value) {
+  return crypto.createHash("sha256").update(String(value || "")).digest("hex");
+}
+function secretHashMatches(expectedHash, rawValue) {
+  if (!expectedHash || !rawValue) return false;
+  try {
+    const expected = Buffer.from(String(expectedHash), "hex");
+    const actual = Buffer.from(secretHash(rawValue), "hex");
+    return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+  } catch {
+    return false;
+  }
 }
 function recoveryCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -2554,15 +2584,31 @@ function clearAutomationControlOnReturn(player) {
   player.automation.returnedAt = Date.now();
   return true;
 }
-function playerOfflineSeconds(player, now = Date.now()) {
-  return Math.max(0, Math.floor((now - Number(player.lastSeen || now)) / 1000));
+function playerPresenceKey(room, player) {
+  return `${room?.code || "?"}:${player?.id || "?"}`;
 }
-function playerIsOffline(player, now = Date.now()) {
-  return now - Number(player.lastSeen || 0) >= 12000;
+function markPlayerPresence(room, player, now = Date.now()) {
+  if (!room?.code || !player?.id) return;
+  playerPresence.set(playerPresenceKey(room, player), { lastSeen: Number(now) || Date.now() });
+}
+function runtimePlayerLastSeen(room, player) {
+  const runtime = playerPresence.get(playerPresenceKey(room, player));
+  if (runtime?.lastSeen) return Number(runtime.lastSeen);
+  return Number(player?.lastSeen || player?.joinedAt || 0);
+}
+function playerOfflineSeconds(room, player, now = Date.now()) {
+  const lastSeen = runtimePlayerLastSeen(room, player);
+  if (!lastSeen) return 0;
+  return Math.max(0, Math.floor((now - lastSeen) / 1000));
+}
+function playerIsOffline(room, player, now = Date.now()) {
+  const lastSeen = runtimePlayerLastSeen(room, player);
+  return !lastSeen || now - lastSeen >= 12000;
 }
 function playerIsAutomationInactive(room, player, now = Date.now()) {
   const config = normalizeAutomationSettings(room.settings);
-  return now - Number(player.lastSeen || 0) >= config.inactivitySeconds * 1000;
+  const lastSeen = runtimePlayerLastSeen(room, player);
+  return !lastSeen || now - lastSeen >= config.inactivitySeconds * 1000;
 }
 function revealRequirement(room, player) {
   if (!player.active || isDetained(room, player) || !player.character) return { required: 0, used: 0, complete: true };
@@ -2702,7 +2748,7 @@ function neutralizePendingPlayers(room, { allPending = false, reason = "тайм
     : phaseRequiredStatus(room).pending;
   const changed = [];
   for (const player of candidates) {
-    if (!allPending && !playerIsOffline(player, now)) continue;
+    if (!allPending && !playerIsOffline(room, player, now)) continue;
     if (neutralizePlayerForPhase(room, player, reason)) changed.push(player.name);
   }
   return changed;
@@ -2950,7 +2996,7 @@ function createGame(room) {
     createdAt: Date.now()
   };
   room.settings.generationSchema = GENERATION_SCHEMA;
-  room.game.log.push(`Відтворювана генерація: seed ${seed}; код ${room.game.generation.configCode}; відбиток ${room.game.generation.fingerprint}.`);
+  room.game.log.push(`Відтворювана генерація: код ${room.game.generation.configCode}; відбиток ${room.game.generation.fingerprint}. Seed буде відкрито після завершення партії.`);
 }
 
 function publicCatastrophe(room, includeHidden = false) {
@@ -3227,9 +3273,21 @@ function ensureRoomSessionState(room) {
   cleanupRecoveryRequests(room);
   return room;
 }
+function secureRecoveryRequest(request) {
+  if (!request || typeof request !== "object") return request;
+  if (!request.requestTokenHash && request.requestToken) request.requestTokenHash = secretHash(request.requestToken);
+  delete request.requestToken;
+  if (request.status === "consumed") request.grantedToken = null;
+  return request;
+}
+function recoveryRequestMatches(request, rawToken) {
+  secureRecoveryRequest(request);
+  return secretHashMatches(request?.requestTokenHash, rawToken);
+}
 function cleanupRecoveryRequests(room, now = Date.now()) {
   room.recoveryRequests ||= [];
   for (const request of room.recoveryRequests) {
+    secureRecoveryRequest(request);
     if (request.status === "pending" && Number(request.expiresAt || 0) <= now) request.status = "expired";
   }
   room.recoveryRequests = room.recoveryRequests
@@ -3259,7 +3317,7 @@ function transferHost(room, target, reason = "Передавання прав") 
 }
 function hostFailoverCandidate(room, now = Date.now()) {
   return [...(room.players || [])]
-    .filter((player) => player.id !== room.hostPlayerId && !playerIsOffline(player, now))
+    .filter((player) => player.id !== room.hostPlayerId && !playerIsOffline(room, player, now))
     .sort((a, b) => Number(Boolean(b.active)) - Number(Boolean(a.active)) || Number(a.joinedAt || 0) - Number(b.joinedAt || 0))[0] || null;
 }
 function processHostFailover(room, now = Date.now()) {
@@ -3267,7 +3325,8 @@ function processHostFailover(room, now = Date.now()) {
   if (room.settings.hostFailoverEnabled === false) return false;
   const host = room.players.find((player) => player.id === room.hostPlayerId);
   const threshold = clamp(Number(room.settings.hostFailoverSeconds) || 120, MIN_HOST_FAILOVER_SECONDS, 900);
-  if (host && now - Number(host.lastSeen || 0) < threshold * 1000) return false;
+  const hostLastSeen = runtimePlayerLastSeen(room, host);
+  if (host && hostLastSeen && now - hostLastSeen < threshold * 1000) return false;
   const candidate = hostFailoverCandidate(room, now);
   if (!candidate) return false;
   const hostName = host?.name || "Попередній хост";
@@ -3413,7 +3472,7 @@ function auth(room, playerId, playerToken) {
 }
 
 function publicPlayer(player, room) {
-  const connected = !playerIsOffline(player);
+  const connected = !playerIsOffline(room, player);
   const revealed = {};
   if (player.character) {
     for (const key of characterKeysForRoom(room)) {
@@ -3432,7 +3491,7 @@ function publicPlayer(player, room) {
     isHost: player.id === room.hostPlayerId,
     ready: player.ready,
     connected,
-    secondsSinceSeen: playerOfflineSeconds(player),
+    secondsSinceSeen: playerOfflineSeconds(room, player),
     automationControlled: Boolean(player.automation?.controlled),
     automationLastAction: player.automation?.lastAction || null,
     active: player.active,
@@ -3470,7 +3529,7 @@ function hostDashboardFor(room) {
   const now = Date.now();
   const features = game.features || publicModeFeatures(room.settings);
   const playerRows = room.players.map((player) => {
-    const connected = !playerIsOffline(player, now);
+    const connected = !playerIsOffline(room, player, now);
     const detained = Boolean(player.character && isDetained(room, player));
     const silenced = Boolean(player.character && isSilenced(room, player));
     const protectedStatus = Boolean(player.character && player.character.protectedRound === game.round);
@@ -3544,7 +3603,7 @@ function hostDashboardFor(room) {
       name: player.name,
       active,
       connected,
-      secondsSinceSeen: playerOfflineSeconds(player, now),
+      secondsSinceSeen: playerOfflineSeconds(room, player, now),
       automationControlled: Boolean(player.automation?.controlled),
       automationLastAction: player.automation?.lastAction || null,
       autoSkipped,
@@ -3601,12 +3660,12 @@ function sessionManagementState(room, requester) {
   const requests = cleanupRecoveryRequests(room);
   return {
     recoveryCode: requester.recoveryCode,
-    host: host ? { id: host.id, name: host.name, connected: !playerIsOffline(host), secondsSinceSeen: playerOfflineSeconds(host) } : null,
+    host: host ? { id: host.id, name: host.name, connected: !playerIsOffline(room, host), secondsSinceSeen: playerOfflineSeconds(room, host) } : null,
     failoverEnabled: room.settings.hostFailoverEnabled !== false,
     failoverSeconds: Number(room.settings.hostFailoverSeconds || 120),
     lastHostChange: (room.hostHistory || []).slice(-1)[0] || null,
     transferCandidates: requester.id === room.hostPlayerId
-      ? room.players.filter((player) => player.id !== requester.id).map((player) => ({ id: player.id, name: player.name, connected: !playerIsOffline(player), active: Boolean(player.active) }))
+      ? room.players.filter((player) => player.id !== requester.id).map((player) => ({ id: player.id, name: player.name, connected: !playerIsOffline(room, player), active: Boolean(player.active) }))
       : [],
     recoveryRequests: requester.id === room.hostPlayerId
       ? requests.filter((request) => request.status === "pending").map((request) => ({ id: request.id, playerId: request.playerId, playerName: request.playerName, createdAt: request.createdAt, expiresAt: request.expiresAt }))
@@ -3943,14 +4002,16 @@ function buildState(room, requester) {
     },
     final: room.game.final
   } : null;
+  const generation = publicGenerationState(room, requester);
   return {
     ok: true,
     version: VERSION,
     revision: room.revision,
     code: room.code,
-    generation: publicGenerationState(room),
+    generation,
     settings: {
       ...room.settings,
+      generationSeed: generation.seed,
       contentPackName: room.game?.contentPack?.name || platform.getPack(room.settings.contentPackId)?.name || null,
       campaignName: room.game?.campaign?.name || platform.getCampaign(room.campaignId)?.name || null
     },
@@ -6376,7 +6437,7 @@ function handleAction(room, player, action, body) {
       if (player.id !== room.hostPlayerId) throw gameRuleError("Лише хост може передавати права ведучого.");
       const target = room.players.find((item) => item.id === body.targetId);
       if (!target || target.id === player.id) throw gameRuleError("Оберіть іншого гравця.");
-      if (playerIsOffline(target)) throw gameRuleError("Передати права можна лише підключеному гравцеві.");
+      if (playerIsOffline(room, target)) throw gameRuleError("Передати права можна лише підключеному гравцеві.");
       transferHost(room, target, `Хост ${player.name} передав права`);
       break;
     }
@@ -6406,6 +6467,7 @@ function handleAction(room, player, action, body) {
         request.resolvedAt = Date.now();
         request.grantedToken = target.token;
         request.expiresAt = Date.now() + 10 * 60 * 1000;
+        request.claimedAt = null;
         if (room.game) room.game.log.push(`Хост підтвердив перенесення сеансу гравця ${target.name}.`);
       }
       break;
@@ -6537,7 +6599,7 @@ function jsonResponse(res, status, payload, extraHeaders = {}) {
 function requestBodyLimit(req) {
   const pathname = new URL(req.url || "/", "http://localhost").pathname;
   if (/^\/api\/accounts\/(login|register|reset-password)$/u.test(pathname)) return 8 * 1024;
-  if (/^\/api\/rooms\/[A-Z0-9]{6}\/action$/u.test(pathname) || /^\/api\/rooms\/(create|join|rejoin|recovery-request)$/u.test(pathname)) return 64 * 1024;
+  if (/^\/api\/rooms\/[A-Z0-9]{6}\/action$/u.test(pathname) || /^\/api\/rooms\/(create|join|rejoin|recovery-request|recovery-claim)$/u.test(pathname)) return 64 * 1024;
   if (/^\/api\/packs\/(import|analyze)$/u.test(pathname)) return 5 * 1024 * 1024;
   if (/^\/api\/packs/u.test(pathname)) return 2 * 1024 * 1024;
   return 256 * 1024;
@@ -6590,7 +6652,8 @@ function mimeType(filePath) {
     ".md": "text/markdown; charset=utf-8",
     ".png": "image/png",
     ".svg": "image/svg+xml",
-    ".ico": "image/x-icon"
+    ".ico": "image/x-icon",
+    ".wav": "audio/wav"
   })[ext] || "application/octet-stream";
 }
 function serveStatic(req, res, pathname) {
@@ -6636,7 +6699,7 @@ function rateLimit(req, url, pathname = "") {
   const ip = clientIp(req);
   const isState = req.method === "GET" && /^\/api\/rooms\/[A-Z0-9]{6}\/state$/.test(pathname);
   const isAction = req.method === "POST" && /^\/api\/rooms\/[A-Z0-9]{6}\/action$/.test(pathname);
-  const isSensitive = /^\/api\/(accounts\/(login|register)|rooms\/(rejoin|recovery-request|recovery-status))$/.test(pathname);
+  const isSensitive = /^\/api\/(accounts\/(login|register)|rooms\/(rejoin|recovery-request|recovery-status|recovery-claim))$/.test(pathname);
   const playerId = String(url.searchParams.get("playerId") || req.headers["x-player-id"] || "anonymous").slice(0, 96);
   let policy;
   if (isState) policy = { kind: "state", session: [180, 3], shared: [2400, 40] };
@@ -6696,8 +6759,7 @@ function waitForRoomRevision(room, revision, waitMs, player, req, res) {
     };
     waiters.add(waiter);
     const keepAlive = () => {
-      player.lastSeen = Date.now();
-      player.connected = true;
+      markPlayerPresence(room, player);
     };
     heartbeat = setInterval(keepAlive, 3000);
     heartbeat.unref?.();
@@ -6818,6 +6880,7 @@ const server = http.createServer(async (req, res) => {
       if (!name) return jsonResponse(res, 400, { ok: false, error: "Введіть ім’я." });
       const code = roomCode();
       const player = { id: uid("player"), token: token(), recoveryCode: uniqueRecoveryCode(), sessionGeneration: 1, joinedAt: Date.now(), name, accountId: account?.id || null, ready: true, connected: true, lastSeen: Date.now(), active: true, character: null, automation: { controlled: false } };
+      markPlayerPresence({ code }, player);
       const mode = GAME_MODES[body.mode] ? body.mode : "classic";
       const campaign = platform.campaignForRoom(account, body.campaignId);
       const pack = platform.packForRoom(account, body.contentPackId);
@@ -6874,6 +6937,7 @@ const server = http.createServer(async (req, res) => {
       if (room.players.length >= 12) return jsonResponse(res, 409, { ok: false, error: "У кімнаті вже 12 гравців." });
       if (room.players.some((item) => item.name.toLowerCase() === name.toLowerCase())) return jsonResponse(res, 409, { ok: false, error: "Таке ім’я вже використовується." });
       const player = { id: uid("player"), token: token(), recoveryCode: uniqueRecoveryCode(room), sessionGeneration: 1, joinedAt: Date.now(), name, accountId: account?.id || null, ready: false, connected: true, lastSeen: Date.now(), active: true, character: null, automation: { controlled: false } };
+      markPlayerPresence(room, player);
       room.players.push(player);
       touch(room);
       return jsonResponse(res, 201, { ok: true, code, playerId: player.id, token: player.token, recoveryCode: player.recoveryCode });
@@ -6894,6 +6958,7 @@ const server = http.createServer(async (req, res) => {
       player.sessionGeneration = Number(player.sessionGeneration || 1) + 1;
       player.connected = true;
       player.lastSeen = Date.now();
+      markPlayerPresence(room, player);
       clearAutomationControlOnReturn(player);
       touch(room);
       return jsonResponse(res, 200, { ok: true, code, playerId: player.id, token: player.token, recoveryCode: player.recoveryCode, name: player.name });
@@ -6910,50 +6975,68 @@ const server = http.createServer(async (req, res) => {
       const player = room.players.find((item) => item.name.toLocaleLowerCase("uk") === name.toLocaleLowerCase("uk"));
       if (!player) return jsonResponse(res, 404, { ok: false, error: "Гравця з таким ім’ям у кімнаті не знайдено." });
       for (const existing of cleanupRecoveryRequests(room).filter((request) => request.playerId === player.id && request.status === "pending")) existing.status = "superseded";
-      const request = { id: uid("recovery"), requestToken: token(), playerId: player.id, playerName: player.name, createdAt: Date.now(), expiresAt: Date.now() + 10 * 60 * 1000, status: "pending", grantedToken: null };
+      const rawRequestToken = token();
+      const request = { id: uid("recovery"), requestTokenHash: secretHash(rawRequestToken), playerId: player.id, playerName: player.name, createdAt: Date.now(), expiresAt: Date.now() + 10 * 60 * 1000, status: "pending", grantedToken: null, claimedAt: null };
       room.recoveryRequests.push(request);
       touch(room);
-      return jsonResponse(res, 201, { ok: true, code, requestId: request.id, requestToken: request.requestToken, status: request.status, playerName: player.name });
+      return jsonResponse(res, 201, { ok: true, code, requestId: request.id, requestToken: rawRequestToken, status: request.status, playerName: player.name });
     }
 
     if (pathname === "/api/rooms/recovery-status" && req.method === "GET") {
+      if (url.searchParams.has("requestToken")) return jsonResponse(res, 400, { ok: false, error: "Секрет запиту відновлення потрібно передавати лише в заголовку X-Recovery-Request-Token." });
       const code = String(url.searchParams.get("code") || "").trim().toUpperCase();
       const room = rooms.get(code);
       if (!room) return jsonResponse(res, 404, { ok: false, error: "Кімнату не знайдено." });
-      const request = cleanupRecoveryRequests(room).find((item) => item.id === url.searchParams.get("requestId") && item.requestToken === url.searchParams.get("requestToken"));
+      const requestTokenValue = String(req.headers["x-recovery-request-token"] || "");
+      const request = cleanupRecoveryRequests(room).find((item) => item.id === url.searchParams.get("requestId") && recoveryRequestMatches(item, requestTokenValue));
       if (!request) return jsonResponse(res, 404, { ok: false, error: "Запит відновлення не знайдено або він прострочений." });
-      if (request.status === "approved") {
-        const player = room.players.find((item) => item.id === request.playerId);
-        if (!player || !request.grantedToken) return jsonResponse(res, 409, { ok: false, error: "Сеанс уже недоступний." });
-        player.connected = true;
-        player.lastSeen = Date.now();
-        clearAutomationControlOnReturn(player);
-        return jsonResponse(res, 200, { ok: true, status: "approved", code, playerId: player.id, token: request.grantedToken, recoveryCode: player.recoveryCode, name: player.name });
-      }
-      return jsonResponse(res, 200, { ok: true, status: request.status, code, playerName: request.playerName, expiresAt: request.expiresAt });
+      return jsonResponse(res, 200, { ok: true, status: request.status, code, playerName: request.playerName, expiresAt: request.expiresAt, claimRequired: request.status === "approved" });
+    }
+
+    if (pathname === "/api/rooms/recovery-claim" && req.method === "POST") {
+      const body = await readJson(req);
+      const code = String(body.code || "").trim().toUpperCase();
+      const room = rooms.get(code);
+      if (!room) return jsonResponse(res, 404, { ok: false, error: "Кімнату не знайдено." });
+      const requestTokenValue = String(req.headers["x-recovery-request-token"] || "");
+      const request = cleanupRecoveryRequests(room).find((item) => item.id === String(body.requestId || "") && recoveryRequestMatches(item, requestTokenValue));
+      if (!request) return jsonResponse(res, 404, { ok: false, error: "Запит відновлення не знайдено або він прострочений." });
+      if (request.status === "consumed") return jsonResponse(res, 410, { ok: false, error: "Новий сеанс уже було отримано. Створіть інший запит відновлення." });
+      if (request.status !== "approved") return jsonResponse(res, 409, { ok: false, error: "Запит іще не схвалено або він уже недоступний.", status: request.status });
+      const player = room.players.find((item) => item.id === request.playerId);
+      if (!player || !request.grantedToken) return jsonResponse(res, 409, { ok: false, error: "Сеанс уже недоступний." });
+      const grantedToken = request.grantedToken;
+      request.status = "consumed";
+      request.claimedAt = Date.now();
+      request.grantedToken = null;
+      player.connected = true;
+      player.lastSeen = Date.now();
+      markPlayerPresence(room, player);
+      clearAutomationControlOnReturn(player);
+      touch(room);
+      return jsonResponse(res, 200, { ok: true, status: "approved", code, playerId: player.id, token: grantedToken, recoveryCode: player.recoveryCode, name: player.name });
     }
 
     const stateMatch = pathname.match(/^\/api\/rooms\/([A-Z0-9]{6})\/state$/);
     if (stateMatch && req.method === "GET") {
       networkMetrics.stateRequests += 1;
+      if (url.searchParams.has("token")) return jsonResponse(res, 400, { ok: false, error: "Токен гравця потрібно передавати лише в заголовку X-Player-Token." });
       const room = rooms.get(stateMatch[1]);
       if (!room) return jsonResponse(res, 404, { ok: false, error: "Кімнату не знайдено." });
       const player = auth(
         room,
         req.headers["x-player-id"] || url.searchParams.get("playerId"),
-        req.headers["x-player-token"] || url.searchParams.get("token")
+        req.headers["x-player-token"]
       );
       if (!player) return jsonResponse(res, 401, { ok: false, error: "Сеанс гравця недійсний." });
-      player.lastSeen = Date.now();
-      player.connected = true;
+      markPlayerPresence(room, player);
       const sinceRevision = Number(url.searchParams.get("sinceRevision"));
       const waitMs = clamp(Number(url.searchParams.get("waitMs")) || 0, 0, 25_000);
       if (Number.isFinite(sinceRevision) && sinceRevision === room.revision && waitMs > 0) {
         const reason = await waitForRoomRevision(room, sinceRevision, waitMs, player, req, res);
         if (reason === "aborted" || res.writableEnded || res.destroyed) return;
       }
-      player.lastSeen = Date.now();
-      player.connected = true;
+      markPlayerPresence(room, player);
       return jsonResponse(res, 200, { ...buildState(room, player), network: { transport: "long-poll", recommendedWaitMs: 20_000, serverTime: Date.now() } }, limitResult ? rateHeaders(limitResult) : {});
     }
 
@@ -6964,7 +7047,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req);
       const player = auth(room, body.playerId, body.token);
       if (!player) return jsonResponse(res, 401, { ok: false, error: "Сеанс гравця недійсний." });
-      player.lastSeen = Date.now();
+      markPlayerPresence(room, player);
       try {
         handleAction(room, player, String(body.action || ""), body);
       } catch (error) {

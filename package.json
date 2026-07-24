@@ -13,9 +13,18 @@
     "test:unit": "node run_all_tests.js --unit",
     "audit:content": "node scripts/content_editorial_audit.js",
     "audit:abilities": "node scripts/ability_balance_audit.js",
-    "audit": "npm run audit:content && npm run audit:abilities",
-    "check:syntax": "node --check server.js && node --check platform.js && node --check lib/room_store.js && node --check lib/platform_store_loader.js",
-    "verify": "npm test && npm run audit && npm run check:syntax"
+    "audit": "npm run audit:content && npm run audit:abilities && npm run audit:rulebook && npm run audit:rulebook:architecture && npm run audit:rulebook:release && npm run audit:rulebook:delivery && npm run audit:rulebook:rc",
+    "check:syntax": "node --check server.js && node --check platform.js && node --check public/app.js && node --check test_runtime_setup.js && node --check lib/room_store.js && node --check lib/platform_store_loader.js && node --check scripts/rulebook_validate.js && node --check scripts/rulebook_build_runtime.js && node --check scripts/rulebook_architecture_validate.js && node --check public/rulebook/rulebook-config.js && node --check public/rulebook/rulebook-loader.js && node --check public/rulebook/rulebook-model.js && node --check public/rulebook/page-layout.js && node --check test_rulebook_content_213.js && node --check test_rulebook_architecture_214.js && node --check public/rulebook/rulebook-renderer.js && node --check public/rulebook/rulebook-search.js && node --check public/rulebook/rulebook-library.js && node --check public/rulebook/rulebook-audio.js && node --check public/rulebook/page-turn.js && node --check public/rulebook/rulebook-shell.js && node --check test_rulebook_shell_215.js && node --check test_rulebook_navigation_216.js && node --check test_rulebook_context_interactivity_217.js && node --check test_rulebook_completion_218.js && node --check scripts/rulebook_release_validate.js && node --check test_rulebook_validation_219.js && node --check scripts/rulebook_delivery_validate.js && node --check test_rulebook_delivery_220.js && node --check public/rulebook/rulebook-feedback.js && node --check scripts/rulebook_change_guard.js && node --check scripts/rulebook_release_gate.js && node --check test_rulebook_release_candidate_221.js",
+    "verify": "npm test && npm run audit && npm run check:syntax",
+    "audit:rulebook": "node scripts/rulebook_validate.js",
+    "build:rulebook": "node scripts/rulebook_build_runtime.js",
+    "audit:rulebook:architecture": "node scripts/rulebook_architecture_validate.js",
+    "audit:rulebook:release": "node scripts/rulebook_release_validate.js",
+    "audit:rulebook:delivery": "node scripts/rulebook_delivery_validate.js",
+    "audit:rulebook:sync": "node scripts/rulebook_change_guard.js",
+    "audit:rulebook:rc": "node scripts/rulebook_release_gate.js --mode=rc",
+    "release:rulebook:rc": "npm run build:rulebook && node scripts/rulebook_release_gate.js --mode=rc",
+    "release:rulebook:final": "npm run build:rulebook && node scripts/rulebook_release_gate.js --mode=final"
   },
   "engines": {
     "node": ">=20"

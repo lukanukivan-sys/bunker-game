@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 190" role="img" aria-labelledby="t d">
+<title id="t">Цикл раунду</title><desc id="d">П'ять послідовних фаз: розкриття, обговорення, криза, рішення, наслідки.</desc>
+<defs><filter id="s" x="-10%" y="-20%" width="120%" height="150%"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#59472e" flood-opacity=".14"/></filter></defs>
+<g filter="url(#s)">
+<path d="M85 94H555" fill="none" stroke="#8e7a57" stroke-width="2.5" stroke-linecap="round"/>
+<g font-family="system-ui,sans-serif" font-weight="750" text-anchor="middle">
+<g fill="#e9dec5" stroke="#91784c" stroke-width="1.8"><circle cx="80" cy="94" r="43"/><circle cx="200" cy="94" r="43"/><circle cx="440" cy="94" r="43"/><circle cx="560" cy="94" r="43"/></g>
+<circle cx="320" cy="94" r="47" fill="#e6a72f" stroke="#ae7613" stroke-width="2"/>
+<g fill="#2f2b24" font-size="12.5"><text x="80" y="89">РОЗКРИТТЯ</text><text x="200" y="89">ОБГОВОРЕННЯ</text><text x="320" y="89">КРИЗА</text><text x="440" y="89">РІШЕННЯ</text><text x="560" y="89">НАСЛІДКИ</text></g>
+<g fill="#76541a" font-size="19"><text x="80" y="115">1</text><text x="200" y="115">2</text><text x="320" y="115">3</text><text x="440" y="115">4</text><text x="560" y="115">5</text></g>
+</g></g></svg>

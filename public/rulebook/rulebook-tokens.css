@@ -1,0 +1,74 @@
+:root {
+  --rulebook-void: #050809;
+  --rulebook-background: #090f12;
+  --rulebook-backdrop: rgba(2, 5, 7, 0.88);
+  --rulebook-surface: #10181c;
+  --rulebook-surface-raised: #172126;
+  --rulebook-steel: #253238;
+  --rulebook-paper: #d8d0bd;
+  --rulebook-paper-deep: #c7bda7;
+  --rulebook-paper-ink: #202522;
+  --rulebook-paper-muted: #5d625d;
+  --rulebook-text-main: #edf1ee;
+  --rulebook-text-secondary: #a7b1ae;
+  --rulebook-text-muted: #717d7a;
+  --rulebook-amber: #e7aa32;
+  --rulebook-amber-bright: #ffc34c;
+  --rulebook-amber-glow: rgba(231, 170, 50, 0.24);
+  --rulebook-danger: #c95245;
+  --rulebook-danger-glow: rgba(201, 82, 69, 0.18);
+  --rulebook-success: #65a77f;
+  --rulebook-information: #6f9eac;
+  --rulebook-focus: #ffd77e;
+
+  --rulebook-font-display: "Arial Narrow", "Roboto Condensed", "Segoe UI", sans-serif;
+  --rulebook-font-body: Inter, "Segoe UI", Arial, sans-serif;
+  --rulebook-font-document: Georgia, "Times New Roman", serif;
+  --rulebook-font-mono: "Cascadia Mono", Consolas, monospace;
+
+  --rulebook-space-1: 0.25rem;
+  --rulebook-space-2: 0.5rem;
+  --rulebook-space-3: 0.75rem;
+  --rulebook-space-4: 1rem;
+  --rulebook-space-5: 1.5rem;
+  --rulebook-space-6: 2rem;
+  --rulebook-space-7: 3rem;
+  --rulebook-space-8: 4rem;
+
+  --rulebook-radius-control: 0.55rem;
+  --rulebook-radius-panel: 0.85rem;
+  --rulebook-radius-book: 1rem;
+  --rulebook-radius-pill: 999px;
+
+  --rulebook-shadow-book: 0 2rem 5rem rgba(0, 0, 0, 0.56);
+  --rulebook-shadow-page: 0 1rem 2rem rgba(0, 0, 0, 0.22);
+  --rulebook-shadow-inset: inset 0 0 2.5rem rgba(48, 38, 25, 0.16);
+  --rulebook-shadow-focus: 0 0 0 3px rgba(255, 215, 126, 0.42);
+
+  --rulebook-motion-fast: 120ms;
+  --rulebook-motion-normal: 220ms;
+  --rulebook-motion-page-turn: 680ms;
+  --rulebook-motion-easing: cubic-bezier(0.42, 0, 0.25, 1);
+
+  --rulebook-book-max-width: 92rem;
+  --rulebook-book-max-height: 62rem;
+  --rulebook-page-aspect-ratio: 0.72;
+  --rulebook-page-padding: clamp(1rem, 1.8vw, 2rem);
+  --rulebook-spine-width: 1.25rem;
+  --rulebook-toolbar-height: 3.35rem;
+
+  --rulebook-z-backdrop: 900;
+  --rulebook-z-book: 910;
+  --rulebook-z-page: 920;
+  --rulebook-z-turning-page: 930;
+  --rulebook-z-drawer: 940;
+  --rulebook-z-tooltip: 950;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --rulebook-motion-fast: 0ms;
+    --rulebook-motion-normal: 0ms;
+    --rulebook-motion-page-turn: 0ms;
+  }
+}

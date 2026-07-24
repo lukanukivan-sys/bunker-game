@@ -1,0 +1,12 @@
+{
+  "schema": "rulebook-human-acceptance-v1",
+  "status": "pending",
+  "minimumParticipants": 3,
+  "minimumCompletedScenariosPerParticipant": 8,
+  "targetAnswerSeconds": 20,
+  "sessions": [],
+  "blockingFindings": [],
+  "approvedBy": null,
+  "approvedAt": null,
+  "note": "Файл заповнюється лише після реального тестування з людьми, які не створювали довідник."
+}

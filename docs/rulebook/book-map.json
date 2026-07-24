@@ -1,0 +1,723 @@
+{
+  "schema": "rulebook-book-map-v1",
+  "bookId": "skhovyshche-rulebook",
+  "title": "СХОВИЩЕ — інтерактивний довідник",
+  "physicalPageCount": 44,
+  "desktopLayout": "two-page-spread",
+  "mobileLayout": "single-page",
+  "pages": [
+    {
+      "number": 0,
+      "id": "front-cover",
+      "chapterId": null,
+      "anchor": null,
+      "template": "cover",
+      "status": "canonical",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "cover"
+    },
+    {
+      "number": 1,
+      "id": "title-page",
+      "chapterId": "introduction",
+      "anchor": "title-page",
+      "template": "title",
+      "status": "canonical",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 2,
+      "id": "how-to-use",
+      "chapterId": "introduction",
+      "anchor": "how-to-use",
+      "template": "standard",
+      "status": "canonical",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 3,
+      "id": "contents",
+      "chapterId": "introduction",
+      "anchor": "contents-overview",
+      "template": "contents",
+      "status": "canonical",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 4,
+      "id": "quick-overview",
+      "chapterId": "quick-start",
+      "anchor": "quick-overview",
+      "template": "chapter-opener",
+      "status": "canonical",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 5,
+      "id": "join-room",
+      "chapterId": "quick-start",
+      "anchor": "join-room",
+      "template": "standard",
+      "status": "canonical",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 6,
+      "id": "lobby-ready",
+      "chapterId": "quick-start",
+      "anchor": "lobby-ready",
+      "template": "checklist",
+      "status": "canonical",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 7,
+      "id": "first-round",
+      "chapterId": "quick-start",
+      "anchor": "first-round",
+      "template": "flow",
+      "status": "canonical",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 8,
+      "id": "dossier",
+      "chapterId": "player-guide",
+      "anchor": "dossier",
+      "template": "chapter-opener",
+      "status": "canonical",
+      "audience": "player",
+      "modes": [
+        "all"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 9,
+      "id": "hidden-open",
+      "chapterId": "player-guide",
+      "anchor": "hidden-and-open",
+      "template": "dossier",
+      "status": "canonical",
+      "audience": "player",
+      "modes": [
+        "all"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 10,
+      "id": "round-cycle",
+      "chapterId": "player-guide",
+      "anchor": "round-cycle",
+      "template": "flow",
+      "status": "canonical",
+      "audience": "player",
+      "modes": [
+        "all"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 11,
+      "id": "required-actions",
+      "chapterId": "player-guide",
+      "anchor": "required-actions",
+      "template": "standard",
+      "status": "canonical",
+      "audience": "player",
+      "modes": [
+        "all"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 12,
+      "id": "crisis",
+      "chapterId": "player-guide",
+      "anchor": "crisis",
+      "template": "warning",
+      "status": "provisional",
+      "audience": "player",
+      "modes": [
+        "all"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 13,
+      "id": "voting",
+      "chapterId": "player-guide",
+      "anchor": "voting",
+      "template": "decision",
+      "status": "provisional",
+      "audience": "player",
+      "modes": [
+        "classic",
+        "factions",
+        "detective",
+        "advanced"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 14,
+      "id": "sanctions",
+      "chapterId": "player-guide",
+      "anchor": "sanctions",
+      "template": "comparison",
+      "status": "provisional",
+      "audience": "player",
+      "modes": [
+        "classic",
+        "factions",
+        "advanced"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 15,
+      "id": "resources",
+      "chapterId": "mechanics",
+      "anchor": "resources",
+      "template": "dashboard",
+      "status": "provisional",
+      "audience": "all",
+      "modes": [
+        "survival",
+        "advanced"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 16,
+      "id": "medicine",
+      "chapterId": "mechanics",
+      "anchor": "medicine",
+      "template": "procedure",
+      "status": "provisional",
+      "audience": "all",
+      "modes": [
+        "advanced"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 17,
+      "id": "operations",
+      "chapterId": "mechanics",
+      "anchor": "operations",
+      "template": "flow",
+      "status": "canonical",
+      "audience": "all",
+      "modes": [
+        "survival",
+        "advanced"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 18,
+      "id": "trade",
+      "chapterId": "mechanics",
+      "anchor": "trade",
+      "template": "procedure",
+      "status": "canonical",
+      "audience": "all",
+      "modes": [
+        "advanced"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 19,
+      "id": "outside-camp",
+      "chapterId": "mechanics",
+      "anchor": "outside-camp",
+      "template": "chapter-opener",
+      "status": "provisional",
+      "audience": "all",
+      "modes": [
+        "advanced"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 20,
+      "id": "classic-mode",
+      "chapterId": "modes",
+      "anchor": "classic-mode",
+      "template": "mode-opener",
+      "status": "provisional",
+      "audience": "all",
+      "modes": [
+        "classic"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 21,
+      "id": "survival-mode",
+      "chapterId": "modes",
+      "anchor": "survival-mode",
+      "template": "mode-opener",
+      "status": "canonical",
+      "audience": "all",
+      "modes": [
+        "survival"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 22,
+      "id": "factions-mode",
+      "chapterId": "modes",
+      "anchor": "factions-mode",
+      "template": "mode-opener",
+      "status": "canonical",
+      "audience": "all",
+      "modes": [
+        "factions"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 23,
+      "id": "detective-mode",
+      "chapterId": "modes",
+      "anchor": "detective-mode",
+      "template": "mode-opener",
+      "status": "provisional",
+      "audience": "all",
+      "modes": [
+        "detective"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 24,
+      "id": "advanced-mode",
+      "chapterId": "modes",
+      "anchor": "advanced-mode",
+      "template": "mode-opener",
+      "status": "provisional",
+      "audience": "all",
+      "modes": [
+        "advanced"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 25,
+      "id": "module-compatibility",
+      "chapterId": "modes",
+      "anchor": "advanced-mode",
+      "template": "matrix",
+      "status": "provisional",
+      "audience": "host",
+      "modes": [
+        "advanced"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 26,
+      "id": "victory-layers",
+      "chapterId": "results",
+      "anchor": "victory-layers",
+      "template": "comparison",
+      "status": "provisional",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 27,
+      "id": "final-report",
+      "chapterId": "results",
+      "anchor": "final-report",
+      "template": "report",
+      "status": "provisional",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 28,
+      "id": "host-preparation",
+      "chapterId": "host-guide",
+      "anchor": "host-preparation",
+      "template": "chapter-opener",
+      "status": "canonical",
+      "audience": "host",
+      "modes": [
+        "all"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 29,
+      "id": "host-command",
+      "chapterId": "host-guide",
+      "anchor": "host-command",
+      "template": "dashboard",
+      "status": "canonical",
+      "audience": "host",
+      "modes": [
+        "all"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 30,
+      "id": "automation",
+      "chapterId": "host-guide",
+      "anchor": "automation",
+      "template": "comparison",
+      "status": "canonical",
+      "audience": "host",
+      "modes": [
+        "all"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 31,
+      "id": "session-recovery",
+      "chapterId": "host-guide",
+      "anchor": "session-recovery",
+      "template": "procedure",
+      "status": "canonical",
+      "audience": "host",
+      "modes": [
+        "all"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 32,
+      "id": "host-troubleshooting",
+      "chapterId": "host-guide",
+      "anchor": "host-troubleshooting",
+      "template": "troubleshooting",
+      "status": "canonical",
+      "audience": "host",
+      "modes": [
+        "all"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 33,
+      "id": "privacy-seed",
+      "chapterId": "host-guide",
+      "anchor": "privacy-and-seed",
+      "template": "warning",
+      "status": "canonical",
+      "audience": "host",
+      "modes": [
+        "all"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 34,
+      "id": "glossary-a-m",
+      "chapterId": "reference",
+      "anchor": "glossary-a-m",
+      "template": "glossary",
+      "status": "reference",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 35,
+      "id": "glossary-n-z",
+      "chapterId": "reference",
+      "anchor": "glossary-n-z",
+      "template": "glossary",
+      "status": "reference",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 36,
+      "id": "faq-first-game",
+      "chapterId": "reference",
+      "anchor": "faq-first-game",
+      "template": "faq",
+      "status": "reference",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 37,
+      "id": "faq-disputes",
+      "chapterId": "reference",
+      "anchor": "faq-disputes",
+      "template": "faq",
+      "status": "reference",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 38,
+      "id": "phase-reference",
+      "chapterId": "reference",
+      "anchor": "phase-reference",
+      "template": "table",
+      "status": "reference",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 39,
+      "id": "action-reference",
+      "chapterId": "reference",
+      "anchor": "action-reference",
+      "template": "table",
+      "status": "reference",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 40,
+      "id": "rule-changes",
+      "chapterId": "reference",
+      "anchor": "rule-changes",
+      "template": "changelog",
+      "status": "reference",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 41,
+      "id": "accessibility",
+      "chapterId": "reference",
+      "anchor": "accessibility",
+      "template": "settings",
+      "status": "reference",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "recto"
+    },
+    {
+      "number": 42,
+      "id": "edition-version",
+      "chapterId": "edition",
+      "anchor": "edition-version",
+      "template": "edition",
+      "status": "technical",
+      "audience": "technical",
+      "modes": [
+        "all"
+      ],
+      "side": "verso"
+    },
+    {
+      "number": 43,
+      "id": "back-cover",
+      "chapterId": null,
+      "anchor": null,
+      "template": "back-cover",
+      "status": "canonical",
+      "audience": "all",
+      "modes": [
+        "all"
+      ],
+      "side": "cover"
+    }
+  ],
+  "spreads": [
+    {
+      "id": "spread-00",
+      "left": 0,
+      "right": 1,
+      "kind": "cover"
+    },
+    {
+      "id": "spread-01",
+      "left": 2,
+      "right": 3,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-02",
+      "left": 4,
+      "right": 5,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-03",
+      "left": 6,
+      "right": 7,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-04",
+      "left": 8,
+      "right": 9,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-05",
+      "left": 10,
+      "right": 11,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-06",
+      "left": 12,
+      "right": 13,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-07",
+      "left": 14,
+      "right": 15,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-08",
+      "left": 16,
+      "right": 17,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-09",
+      "left": 18,
+      "right": 19,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-10",
+      "left": 20,
+      "right": 21,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-11",
+      "left": 22,
+      "right": 23,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-12",
+      "left": 24,
+      "right": 25,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-13",
+      "left": 26,
+      "right": 27,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-14",
+      "left": 28,
+      "right": 29,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-15",
+      "left": 30,
+      "right": 31,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-16",
+      "left": 32,
+      "right": 33,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-17",
+      "left": 34,
+      "right": 35,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-18",
+      "left": 36,
+      "right": 37,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-19",
+      "left": 38,
+      "right": 39,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-20",
+      "left": 40,
+      "right": 41,
+      "kind": "standard"
+    },
+    {
+      "id": "spread-21",
+      "left": 42,
+      "right": 43,
+      "kind": "cover"
+    }
+  ]
+}

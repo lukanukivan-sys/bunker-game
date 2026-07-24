@@ -1,0 +1,1836 @@
+{
+  "schema": "rulebook-runtime-v1",
+  "productVersion": "1.2.11",
+  "rulebookVersion": "0.8.0-rc.1",
+  "locale": "uk-UA",
+  "manifest": {
+    "schema": "rulebook-manifest-v1",
+    "rulebookVersion": "0.8.0-rc.1",
+    "productVersion": "1.2.11",
+    "locale": "uk-UA",
+    "title": "СХОВИЩЕ — інтерактивний довідник",
+    "subtitle": "Повні правила, контекстна допомога, інтерактивні приклади, пошук і посібник ведучого",
+    "defaultAudience": "player",
+    "statuses": [
+      "canonical",
+      "provisional",
+      "reference",
+      "technical"
+    ],
+    "audiences": {
+      "player": "Гравець",
+      "host": "Ведучий",
+      "all": "Усі учасники",
+      "technical": "Технічний супровід"
+    },
+    "modes": {
+      "all": "Усі режими",
+      "classic": "Класичний відбір",
+      "survival": "Спільне виживання",
+      "factions": "Фракції та зрадники",
+      "detective": "Детектив",
+      "advanced": "Розширена гра"
+    },
+    "parts": [
+      {
+        "id": "entry",
+        "title": "Вхід до системи",
+        "order": 1
+      },
+      {
+        "id": "player",
+        "title": "Посібник гравця",
+        "order": 2
+      },
+      {
+        "id": "mechanics",
+        "title": "Механіки",
+        "order": 3
+      },
+      {
+        "id": "modes",
+        "title": "Режими",
+        "order": 4
+      },
+      {
+        "id": "host",
+        "title": "Посібник ведучого",
+        "order": 5
+      },
+      {
+        "id": "reference",
+        "title": "Довідкові матеріали",
+        "order": 6
+      }
+    ],
+    "chapters": [
+      {
+        "id": "introduction",
+        "file": "content/00-introduction.md",
+        "part": "entry",
+        "order": 1,
+        "status": "canonical"
+      },
+      {
+        "id": "quick-start",
+        "file": "content/01-quick-start.md",
+        "part": "entry",
+        "order": 2,
+        "status": "canonical"
+      },
+      {
+        "id": "player-guide",
+        "file": "content/02-player-guide.md",
+        "part": "player",
+        "order": 3,
+        "status": "provisional"
+      },
+      {
+        "id": "mechanics",
+        "file": "content/03-mechanics.md",
+        "part": "mechanics",
+        "order": 4,
+        "status": "provisional"
+      },
+      {
+        "id": "modes",
+        "file": "content/04-modes.md",
+        "part": "modes",
+        "order": 5,
+        "status": "provisional"
+      },
+      {
+        "id": "results",
+        "file": "content/05-results.md",
+        "part": "modes",
+        "order": 6,
+        "status": "provisional"
+      },
+      {
+        "id": "host-guide",
+        "file": "content/06-host-guide.md",
+        "part": "host",
+        "order": 7,
+        "status": "canonical"
+      },
+      {
+        "id": "reference",
+        "file": "content/07-reference.md",
+        "part": "reference",
+        "order": 8,
+        "status": "reference"
+      },
+      {
+        "id": "edition",
+        "file": "content/08-edition.md",
+        "part": "reference",
+        "order": 9,
+        "status": "technical"
+      }
+    ],
+    "dataFiles": {
+      "bookMap": "book-map.json",
+      "sourceInventory": "source-inventory.json",
+      "unstableRules": "unstable-rules.json",
+      "terminology": "terminology.json",
+      "editorialPolicy": "editorial-policy.json",
+      "uxConfig": "ux-config.json",
+      "designTokens": "design-tokens.json",
+      "versionHistory": "version-history.json",
+      "ruleChanges": "rule-changes.json",
+      "usabilityScenarios": "usability-scenarios.json",
+      "humanAcceptance": "human-acceptance.json"
+    }
+  },
+  "bookMap": {
+    "schema": "rulebook-book-map-v1",
+    "bookId": "skhovyshche-rulebook",
+    "title": "СХОВИЩЕ — інтерактивний довідник",
+    "physicalPageCount": 44,
+    "desktopLayout": "two-page-spread",
+    "mobileLayout": "single-page",
+    "pages": [
+      {
+        "number": 0,
+        "id": "front-cover",
+        "chapterId": null,
+        "anchor": null,
+        "template": "cover",
+        "status": "canonical",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "cover"
+      },
+      {
+        "number": 1,
+        "id": "title-page",
+        "chapterId": "introduction",
+        "anchor": "title-page",
+        "template": "title",
+        "status": "canonical",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 2,
+        "id": "how-to-use",
+        "chapterId": "introduction",
+        "anchor": "how-to-use",
+        "template": "standard",
+        "status": "canonical",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 3,
+        "id": "contents",
+        "chapterId": "introduction",
+        "anchor": "contents-overview",
+        "template": "contents",
+        "status": "canonical",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 4,
+        "id": "quick-overview",
+        "chapterId": "quick-start",
+        "anchor": "quick-overview",
+        "template": "chapter-opener",
+        "status": "canonical",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 5,
+        "id": "join-room",
+        "chapterId": "quick-start",
+        "anchor": "join-room",
+        "template": "standard",
+        "status": "canonical",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 6,
+        "id": "lobby-ready",
+        "chapterId": "quick-start",
+        "anchor": "lobby-ready",
+        "template": "checklist",
+        "status": "canonical",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 7,
+        "id": "first-round",
+        "chapterId": "quick-start",
+        "anchor": "first-round",
+        "template": "flow",
+        "status": "canonical",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 8,
+        "id": "dossier",
+        "chapterId": "player-guide",
+        "anchor": "dossier",
+        "template": "chapter-opener",
+        "status": "canonical",
+        "audience": "player",
+        "modes": [
+          "all"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 9,
+        "id": "hidden-open",
+        "chapterId": "player-guide",
+        "anchor": "hidden-and-open",
+        "template": "dossier",
+        "status": "canonical",
+        "audience": "player",
+        "modes": [
+          "all"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 10,
+        "id": "round-cycle",
+        "chapterId": "player-guide",
+        "anchor": "round-cycle",
+        "template": "flow",
+        "status": "canonical",
+        "audience": "player",
+        "modes": [
+          "all"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 11,
+        "id": "required-actions",
+        "chapterId": "player-guide",
+        "anchor": "required-actions",
+        "template": "standard",
+        "status": "canonical",
+        "audience": "player",
+        "modes": [
+          "all"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 12,
+        "id": "crisis",
+        "chapterId": "player-guide",
+        "anchor": "crisis",
+        "template": "warning",
+        "status": "provisional",
+        "audience": "player",
+        "modes": [
+          "all"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 13,
+        "id": "voting",
+        "chapterId": "player-guide",
+        "anchor": "voting",
+        "template": "decision",
+        "status": "provisional",
+        "audience": "player",
+        "modes": [
+          "classic",
+          "factions",
+          "detective",
+          "advanced"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 14,
+        "id": "sanctions",
+        "chapterId": "player-guide",
+        "anchor": "sanctions",
+        "template": "comparison",
+        "status": "provisional",
+        "audience": "player",
+        "modes": [
+          "classic",
+          "factions",
+          "advanced"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 15,
+        "id": "resources",
+        "chapterId": "mechanics",
+        "anchor": "resources",
+        "template": "dashboard",
+        "status": "provisional",
+        "audience": "all",
+        "modes": [
+          "survival",
+          "advanced"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 16,
+        "id": "medicine",
+        "chapterId": "mechanics",
+        "anchor": "medicine",
+        "template": "procedure",
+        "status": "provisional",
+        "audience": "all",
+        "modes": [
+          "advanced"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 17,
+        "id": "operations",
+        "chapterId": "mechanics",
+        "anchor": "operations",
+        "template": "flow",
+        "status": "canonical",
+        "audience": "all",
+        "modes": [
+          "survival",
+          "advanced"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 18,
+        "id": "trade",
+        "chapterId": "mechanics",
+        "anchor": "trade",
+        "template": "procedure",
+        "status": "canonical",
+        "audience": "all",
+        "modes": [
+          "advanced"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 19,
+        "id": "outside-camp",
+        "chapterId": "mechanics",
+        "anchor": "outside-camp",
+        "template": "chapter-opener",
+        "status": "provisional",
+        "audience": "all",
+        "modes": [
+          "advanced"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 20,
+        "id": "classic-mode",
+        "chapterId": "modes",
+        "anchor": "classic-mode",
+        "template": "mode-opener",
+        "status": "provisional",
+        "audience": "all",
+        "modes": [
+          "classic"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 21,
+        "id": "survival-mode",
+        "chapterId": "modes",
+        "anchor": "survival-mode",
+        "template": "mode-opener",
+        "status": "canonical",
+        "audience": "all",
+        "modes": [
+          "survival"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 22,
+        "id": "factions-mode",
+        "chapterId": "modes",
+        "anchor": "factions-mode",
+        "template": "mode-opener",
+        "status": "canonical",
+        "audience": "all",
+        "modes": [
+          "factions"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 23,
+        "id": "detective-mode",
+        "chapterId": "modes",
+        "anchor": "detective-mode",
+        "template": "mode-opener",
+        "status": "provisional",
+        "audience": "all",
+        "modes": [
+          "detective"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 24,
+        "id": "advanced-mode",
+        "chapterId": "modes",
+        "anchor": "advanced-mode",
+        "template": "mode-opener",
+        "status": "provisional",
+        "audience": "all",
+        "modes": [
+          "advanced"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 25,
+        "id": "module-compatibility",
+        "chapterId": "modes",
+        "anchor": "advanced-mode",
+        "template": "matrix",
+        "status": "provisional",
+        "audience": "host",
+        "modes": [
+          "advanced"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 26,
+        "id": "victory-layers",
+        "chapterId": "results",
+        "anchor": "victory-layers",
+        "template": "comparison",
+        "status": "provisional",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 27,
+        "id": "final-report",
+        "chapterId": "results",
+        "anchor": "final-report",
+        "template": "report",
+        "status": "provisional",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 28,
+        "id": "host-preparation",
+        "chapterId": "host-guide",
+        "anchor": "host-preparation",
+        "template": "chapter-opener",
+        "status": "canonical",
+        "audience": "host",
+        "modes": [
+          "all"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 29,
+        "id": "host-command",
+        "chapterId": "host-guide",
+        "anchor": "host-command",
+        "template": "dashboard",
+        "status": "canonical",
+        "audience": "host",
+        "modes": [
+          "all"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 30,
+        "id": "automation",
+        "chapterId": "host-guide",
+        "anchor": "automation",
+        "template": "comparison",
+        "status": "canonical",
+        "audience": "host",
+        "modes": [
+          "all"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 31,
+        "id": "session-recovery",
+        "chapterId": "host-guide",
+        "anchor": "session-recovery",
+        "template": "procedure",
+        "status": "canonical",
+        "audience": "host",
+        "modes": [
+          "all"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 32,
+        "id": "host-troubleshooting",
+        "chapterId": "host-guide",
+        "anchor": "host-troubleshooting",
+        "template": "troubleshooting",
+        "status": "canonical",
+        "audience": "host",
+        "modes": [
+          "all"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 33,
+        "id": "privacy-seed",
+        "chapterId": "host-guide",
+        "anchor": "privacy-and-seed",
+        "template": "warning",
+        "status": "canonical",
+        "audience": "host",
+        "modes": [
+          "all"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 34,
+        "id": "glossary-a-m",
+        "chapterId": "reference",
+        "anchor": "glossary-a-m",
+        "template": "glossary",
+        "status": "reference",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 35,
+        "id": "glossary-n-z",
+        "chapterId": "reference",
+        "anchor": "glossary-n-z",
+        "template": "glossary",
+        "status": "reference",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 36,
+        "id": "faq-first-game",
+        "chapterId": "reference",
+        "anchor": "faq-first-game",
+        "template": "faq",
+        "status": "reference",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 37,
+        "id": "faq-disputes",
+        "chapterId": "reference",
+        "anchor": "faq-disputes",
+        "template": "faq",
+        "status": "reference",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 38,
+        "id": "phase-reference",
+        "chapterId": "reference",
+        "anchor": "phase-reference",
+        "template": "table",
+        "status": "reference",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 39,
+        "id": "action-reference",
+        "chapterId": "reference",
+        "anchor": "action-reference",
+        "template": "table",
+        "status": "reference",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 40,
+        "id": "rule-changes",
+        "chapterId": "reference",
+        "anchor": "rule-changes",
+        "template": "changelog",
+        "status": "reference",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 41,
+        "id": "accessibility",
+        "chapterId": "reference",
+        "anchor": "accessibility",
+        "template": "settings",
+        "status": "reference",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "recto"
+      },
+      {
+        "number": 42,
+        "id": "edition-version",
+        "chapterId": "edition",
+        "anchor": "edition-version",
+        "template": "edition",
+        "status": "technical",
+        "audience": "technical",
+        "modes": [
+          "all"
+        ],
+        "side": "verso"
+      },
+      {
+        "number": 43,
+        "id": "back-cover",
+        "chapterId": null,
+        "anchor": null,
+        "template": "back-cover",
+        "status": "canonical",
+        "audience": "all",
+        "modes": [
+          "all"
+        ],
+        "side": "cover"
+      }
+    ],
+    "spreads": [
+      {
+        "id": "spread-00",
+        "left": 0,
+        "right": 1,
+        "kind": "cover"
+      },
+      {
+        "id": "spread-01",
+        "left": 2,
+        "right": 3,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-02",
+        "left": 4,
+        "right": 5,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-03",
+        "left": 6,
+        "right": 7,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-04",
+        "left": 8,
+        "right": 9,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-05",
+        "left": 10,
+        "right": 11,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-06",
+        "left": 12,
+        "right": 13,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-07",
+        "left": 14,
+        "right": 15,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-08",
+        "left": 16,
+        "right": 17,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-09",
+        "left": 18,
+        "right": 19,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-10",
+        "left": 20,
+        "right": 21,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-11",
+        "left": 22,
+        "right": 23,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-12",
+        "left": 24,
+        "right": 25,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-13",
+        "left": 26,
+        "right": 27,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-14",
+        "left": 28,
+        "right": 29,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-15",
+        "left": 30,
+        "right": 31,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-16",
+        "left": 32,
+        "right": 33,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-17",
+        "left": 34,
+        "right": 35,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-18",
+        "left": 36,
+        "right": 37,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-19",
+        "left": 38,
+        "right": 39,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-20",
+        "left": 40,
+        "right": 41,
+        "kind": "standard"
+      },
+      {
+        "id": "spread-21",
+        "left": 42,
+        "right": 43,
+        "kind": "cover"
+      }
+    ]
+  },
+  "ux": {
+    "schema": "rulebook-ux-v1",
+    "defaultPageId": "front-cover",
+    "layouts": {
+      "desktop": {
+        "id": "two-page-spread",
+        "minWidth": 960,
+        "visiblePages": 2,
+        "turnStep": 2,
+        "showSpine": true,
+        "allowCornerDrag": false
+      },
+      "tablet": {
+        "id": "single-page-wide",
+        "minWidth": 640,
+        "maxWidth": 959,
+        "visiblePages": 1,
+        "turnStep": 1,
+        "showSpine": false,
+        "allowCornerDrag": false
+      },
+      "mobile": {
+        "id": "single-page",
+        "maxWidth": 639,
+        "visiblePages": 1,
+        "turnStep": 1,
+        "showSpine": false,
+        "allowCornerDrag": false
+      }
+    },
+    "navigation": {
+      "buttons": true,
+      "pageEdgeClick": true,
+      "swipe": true,
+      "keyboard": [
+        "ArrowLeft",
+        "ArrowRight",
+        "PageUp",
+        "PageDown",
+        "Home",
+        "End",
+        "Escape"
+      ],
+      "historyDepth": 30,
+      "rememberLastPage": true,
+      "storageKey": "skhovyshche.rulebook.last-page"
+    },
+    "gestures": {
+      "minimumSwipeDistancePx": 44,
+      "maximumSwipeDurationMs": 700,
+      "axisLockRatio": 1.35
+    },
+    "motion": {
+      "defaultMode": "full",
+      "durationMs": 680,
+      "reducedDurationMs": 180,
+      "respectReducedMotion": true,
+      "modes": [
+        "full",
+        "simple",
+        "none"
+      ],
+      "easing": "cubic-bezier(0.42, 0, 0.25, 1)"
+    },
+    "focus": {
+      "trapInsideBook": true,
+      "restoreOpener": true,
+      "initialTarget": "rulebook-close",
+      "announcePageChanges": true
+    },
+    "reading": {
+      "defaultTextScale": 1,
+      "textScaleOptions": [
+        0.9,
+        1,
+        1.125,
+        1.25,
+        1.5
+      ],
+      "scrollFallbackScale": 1.25,
+      "defaultAudience": "player",
+      "defaultMode": "all",
+      "storageKey": "skhovyshche.rulebook.reading.v1",
+      "lineHeightOptions": [
+        "compact",
+        "comfortable",
+        "relaxed"
+      ],
+      "contrastOptions": [
+        "normal",
+        "high"
+      ],
+      "showHintsByDefault": true,
+      "pageFitLevels": [
+        "normal",
+        "compact",
+        "dense",
+        "tight"
+      ],
+      "hideDesktopScrollbars": true
+    },
+    "panels": {
+      "contents": "drawer",
+      "search": "drawer",
+      "settings": "popover",
+      "bookmarks": "drawer"
+    },
+    "audio": {
+      "enabledByDefault": false,
+      "defaultVolume": 0.28,
+      "storageKey": "skhovyshche.rulebook.audio",
+      "cues": [
+        "open",
+        "close"
+      ],
+      "pageTurnSound": false
+    },
+    "search": {
+      "minimumQueryLength": 2,
+      "resultLimit": 24,
+      "debounceMs": 110,
+      "includeTerminologyAliases": true
+    },
+    "library": {
+      "bookmarkStorageKey": "skhovyshche.rulebook.bookmarks",
+      "historyStorageKey": "skhovyshche.rulebook.history",
+      "historyDepth": 30
+    },
+    "performance": {
+      "lazySearchIndex": true,
+      "renderCachePages": 44,
+      "lazyVisuals": true,
+      "resizeDebounceMs": 100
+    }
+  },
+  "designTokens": {
+    "schema": "rulebook-design-tokens-v1",
+    "color": {
+      "void": "#050809",
+      "background": "#090f12",
+      "backdrop": "rgba(2, 5, 7, 0.88)",
+      "surface": "#10181c",
+      "surfaceRaised": "#172126",
+      "steel": "#253238",
+      "paper": "#d8d0bd",
+      "paperDeep": "#c7bda7",
+      "paperInk": "#202522",
+      "paperMuted": "#5d625d",
+      "textMain": "#edf1ee",
+      "textSecondary": "#a7b1ae",
+      "textMuted": "#717d7a",
+      "amber": "#e7aa32",
+      "amberBright": "#ffc34c",
+      "amberGlow": "rgba(231, 170, 50, 0.24)",
+      "danger": "#c95245",
+      "dangerGlow": "rgba(201, 82, 69, 0.18)",
+      "success": "#65a77f",
+      "information": "#6f9eac",
+      "focus": "#ffd77e"
+    },
+    "typography": {
+      "display": "'Arial Narrow', 'Roboto Condensed', 'Segoe UI', sans-serif",
+      "body": "Inter, 'Segoe UI', Arial, sans-serif",
+      "document": "Georgia, 'Times New Roman', serif",
+      "mono": "'Cascadia Mono', Consolas, monospace",
+      "sizes": {
+        "screenTitle": "clamp(2rem, 4vw, 2.75rem)",
+        "callout": "clamp(1.55rem, 3vw, 2rem)",
+        "section": "clamp(1.15rem, 2vw, 1.375rem)",
+        "item": "1.0625rem",
+        "body": "1rem",
+        "help": "0.875rem",
+        "service": "0.75rem"
+      },
+      "lineHeights": {
+        "tight": 1.12,
+        "heading": 1.25,
+        "body": 1.58,
+        "help": 1.45
+      }
+    },
+    "spacing": {
+      "1": "0.25rem",
+      "2": "0.5rem",
+      "3": "0.75rem",
+      "4": "1rem",
+      "5": "1.5rem",
+      "6": "2rem",
+      "7": "3rem",
+      "8": "4rem"
+    },
+    "radius": {
+      "control": "0.55rem",
+      "panel": "0.85rem",
+      "book": "1rem",
+      "pill": "999px"
+    },
+    "shadow": {
+      "book": "0 2rem 5rem rgba(0, 0, 0, 0.56)",
+      "page": "0 1rem 2rem rgba(0, 0, 0, 0.22)",
+      "inset": "inset 0 0 2.5rem rgba(48, 38, 25, 0.16)",
+      "focus": "0 0 0 3px rgba(255, 215, 126, 0.42)"
+    },
+    "motion": {
+      "fast": "120ms",
+      "normal": "220ms",
+      "pageTurn": "680ms",
+      "easing": "cubic-bezier(0.42, 0, 0.25, 1)"
+    },
+    "layout": {
+      "bookMaxWidth": "92rem",
+      "bookMaxHeight": "62rem",
+      "pageAspectRatio": "0.72",
+      "pagePadding": "clamp(1rem, 1.8vw, 2rem)",
+      "spineWidth": "1.25rem",
+      "toolbarHeight": "3.35rem"
+    },
+    "zIndex": {
+      "backdrop": 900,
+      "book": 910,
+      "page": 920,
+      "turningPage": 930,
+      "drawer": 940,
+      "tooltip": 950
+    },
+    "templates": [
+      "cover",
+      "back-cover",
+      "title",
+      "contents",
+      "chapter-opener",
+      "standard",
+      "checklist",
+      "flow",
+      "dossier",
+      "warning",
+      "decision",
+      "comparison",
+      "dashboard",
+      "procedure",
+      "mode-opener",
+      "matrix",
+      "report",
+      "troubleshooting",
+      "glossary",
+      "faq",
+      "table",
+      "changelog",
+      "settings",
+      "edition"
+    ]
+  },
+  "terminology": {
+    "schema": "rulebook-terminology-v1",
+    "terms": [
+      {
+        "id": "active-player",
+        "term": "Активний гравець",
+        "definition": "Учасник, який зараз виконує обов’язкову дію фази.",
+        "aliases": [
+          "поточний гравець"
+        ]
+      },
+      {
+        "id": "automation",
+        "term": "Автоматизація",
+        "definition": "Режим допомоги ведучому: ручний, допоміжний або автоматичний.",
+        "aliases": [
+          "автохост"
+        ]
+      },
+      {
+        "id": "bunker-capacity",
+        "term": "Місткість сховища",
+        "definition": "Максимальна кількість персонажів, для яких передбачено місце у фінальній групі.",
+        "aliases": [
+          "місця у сховищі"
+        ]
+      },
+      {
+        "id": "character-dossier",
+        "term": "Особова справа",
+        "definition": "Приватна картка персонажа з характеристиками, здібністю та станами.",
+        "aliases": [
+          "картка персонажа"
+        ]
+      },
+      {
+        "id": "crisis",
+        "term": "Криза",
+        "definition": "Раундова подія, що вимагає рішення групи або ведучого та створює наслідки.",
+        "aliases": [
+          "подія"
+        ]
+      },
+      {
+        "id": "decision",
+        "term": "Рішення громади",
+        "definition": "Зафіксований вибір учасників у кризі, трибуналі або голосуванні.",
+        "aliases": [
+          "рішення"
+        ]
+      },
+      {
+        "id": "detective-accusation",
+        "term": "Формальне звинувачення",
+        "definition": "Фінальна або раундова дія детективного режиму із зазначенням підозрюваного.",
+        "aliases": [
+          "звинувачення"
+        ]
+      },
+      {
+        "id": "evidence-link",
+        "term": "Ланка доказів",
+        "definition": "Незалежний доказовий елемент, що підсилює або спростовує версію справи.",
+        "aliases": [
+          "доказ"
+        ]
+      },
+      {
+        "id": "exile",
+        "term": "Вигнання",
+        "definition": "Санкція, після якої персонаж залишає активну групу сховища.",
+        "aliases": [
+          "вигнанець"
+        ]
+      },
+      {
+        "id": "final",
+        "term": "Фінал",
+        "definition": "Один підсумковий розрахунок групового, особистого та спеціального результатів.",
+        "aliases": [
+          "завершення партії"
+        ]
+      },
+      {
+        "id": "group-score",
+        "term": "Оцінка громади",
+        "definition": "Підсумковий показник стану групи, який використовується у правилах перемоги.",
+        "aliases": [
+          "груповий бал"
+        ]
+      },
+      {
+        "id": "hidden-role",
+        "term": "Прихована роль",
+        "definition": "Приватна роль або фракція з власною умовою результату.",
+        "aliases": [
+          "таємна роль"
+        ]
+      },
+      {
+        "id": "host",
+        "term": "Ведучий",
+        "definition": "Учасник, який створив кімнату або отримав право керування партією.",
+        "aliases": [
+          "хост"
+        ]
+      },
+      {
+        "id": "intrigue",
+        "term": "Інтрига",
+        "definition": "Прихована дія у фракційному або розширеному циклі.",
+        "aliases": [
+          "таємна дія"
+        ]
+      },
+      {
+        "id": "isolation",
+        "term": "Ізоляція",
+        "definition": "Тимчасовий стан, що обмежує участь персонажа у визначених діях.",
+        "aliases": [
+          "карантин"
+        ]
+      },
+      {
+        "id": "operation",
+        "term": "Операція",
+        "definition": "Практична дія групи: ремонт, експедиція, лікування або інша модульна дія.",
+        "aliases": [
+          "операційна дія"
+        ]
+      },
+      {
+        "id": "phase",
+        "term": "Фаза",
+        "definition": "Частина раунду з визначеним набором доступних і обов’язкових дій.",
+        "aliases": [
+          "етап раунду"
+        ]
+      },
+      {
+        "id": "reveal",
+        "term": "Розкриття",
+        "definition": "Публікація вибраної характеристики особової справи.",
+        "aliases": [
+          "відкрити характеристику"
+        ]
+      },
+      {
+        "id": "recovery",
+        "term": "Відновлення сеансу",
+        "definition": "Процедура повернення до персонажа після втрати локального токена.",
+        "aliases": [
+          "recovery"
+        ]
+      },
+      {
+        "id": "revision",
+        "term": "Ревізія кімнати",
+        "definition": "Службовий номер зміни збереженого стану кімнати.",
+        "aliases": [
+          "revision"
+        ]
+      },
+      {
+        "id": "round",
+        "term": "Раунд",
+        "definition": "Повний цикл фаз, після якого застосовуються наслідки й починається наступний цикл.",
+        "aliases": [
+          "цикл"
+        ]
+      },
+      {
+        "id": "sanction",
+        "term": "Санкція",
+        "definition": "Наслідок рішення громади: вигнання, ізоляція, обмеження голосу або інша визначена дія.",
+        "aliases": [
+          "покарання"
+        ]
+      },
+      {
+        "id": "seed",
+        "term": "Seed генерації",
+        "definition": "Значення для відтворення стартової роздачі за сумісних версій і схем.",
+        "aliases": [
+          "зерно генерації"
+        ]
+      },
+      {
+        "id": "tribunal",
+        "term": "Трибунал",
+        "definition": "Система голосування, у якій група обирає рішення або санкцію за правилами режиму.",
+        "aliases": [
+          "рада"
+        ]
+      },
+      {
+        "id": "vote",
+        "term": "Голос",
+        "definition": "Підтверджений вибір учасника у поточному голосуванні.",
+        "aliases": [
+          "бюлетень"
+        ]
+      }
+    ]
+  },
+  "unstableRules": {
+    "schema": "rulebook-unstable-rules-v1",
+    "policy": "Запис залишається provisional, доки серверна реалізація, інтерфейс, тест і текст правила не пройдуть одну звірку.",
+    "items": [
+      {
+        "id": "RB-PROV-001",
+        "chapterId": "modes",
+        "anchors": [
+          "classic-mode"
+        ],
+        "topic": "Місткість сховища і момент завершення відбору",
+        "workstream": "P0 mechanics — capacity",
+        "status": "open"
+      },
+      {
+        "id": "RB-PROV-002",
+        "chapterId": "mechanics",
+        "anchors": [
+          "resources"
+        ],
+        "topic": "Критичні нульові ресурси та блокувальні умови",
+        "workstream": "P0 mechanics — critical resources",
+        "status": "open"
+      },
+      {
+        "id": "RB-PROV-003",
+        "chapterId": "mechanics",
+        "anchors": [
+          "medicine"
+        ],
+        "topic": "Медична оцінка, лікування і наслідки невиконаної допомоги",
+        "workstream": "P0 mechanics — medicine",
+        "status": "open"
+      },
+      {
+        "id": "RB-PROV-004",
+        "chapterId": "results",
+        "anchors": [
+          "victory-layers",
+          "final-report",
+          "final-trigger"
+        ],
+        "topic": "Фінальна формула та недопущення подвійного врахування",
+        "workstream": "P0 mechanics — final scoring",
+        "status": "open"
+      },
+      {
+        "id": "RB-PROV-005",
+        "chapterId": "player-guide",
+        "anchors": [
+          "crisis",
+          "voting",
+          "sanctions"
+        ],
+        "topic": "Право вибору в кризі, голосування, нічия та санкції",
+        "workstream": "P0 modes — crisis and voting",
+        "status": "open"
+      },
+      {
+        "id": "RB-PROV-006",
+        "chapterId": "modes",
+        "anchors": [
+          "detective-mode"
+        ],
+        "topic": "Доказовий поріг і детективний вердикт",
+        "workstream": "P0 modes — detective verdict",
+        "status": "open"
+      },
+      {
+        "id": "RB-PROV-007",
+        "chapterId": "mechanics",
+        "anchors": [
+          "outside-camp"
+        ],
+        "topic": "Зовнішній табір, апеляція та угоди після вигнання",
+        "workstream": "P0 modes — outside agreements",
+        "status": "open"
+      },
+      {
+        "id": "RB-PROV-008",
+        "chapterId": "modes",
+        "anchors": [
+          "advanced-mode"
+        ],
+        "topic": "Сумісність модулів і остаточний цикл розширеної гри",
+        "workstream": "P0 modes — module compatibility",
+        "status": "open"
+      }
+    ]
+  },
+  "versionHistory": {
+    "schema": "rulebook-version-history-v1",
+    "current": {
+      "productVersion": "1.2.11",
+      "rulebookVersion": "0.8.0-rc.1",
+      "manifestSchema": "rulebook-manifest-v1",
+      "runtimeSchema": "rulebook-runtime-v1",
+      "bookMapSchema": "rulebook-book-map-v1",
+      "locale": "uk-UA",
+      "updatedAt": "2026-07-24"
+    },
+    "entries": [
+      {
+        "rulebookVersion": "0.8.0-rc.1",
+        "productVersion": "1.2.11",
+        "date": "2026-07-24",
+        "status": "release-candidate",
+        "summary": "Релізний gate, приймальні сценарії, локальна opt-in діагностика та CI-захист синхронізації правил."
+      },
+      {
+        "rulebookVersion": "0.7.0-offline-security",
+        "productVersion": "1.2.11",
+        "date": "2026-07-24",
+        "status": "release-candidate",
+        "summary": "Версіонування, журнал змін, локальний fallback, безпечний renderer і розширені автоматичні перевірки."
+      },
+      {
+        "rulebookVersion": "0.6.0-validation",
+        "productVersion": "1.2.11",
+        "date": "2026-07-24",
+        "status": "superseded",
+        "summary": "Безповзункова верстка, автоматичне вміщення та релізна валідація."
+      },
+      {
+        "rulebookVersion": "0.5.0-content-accessibility",
+        "productVersion": "1.2.11",
+        "date": "2026-07-24",
+        "status": "superseded",
+        "summary": "Повний вміст, локальні схеми, налаштування читання та доступність."
+      }
+    ]
+  },
+  "ruleChanges": {
+    "schema": "rulebook-changelog-v1",
+    "productVersion": "1.2.11",
+    "rulebookVersion": "0.8.0-rc.1",
+    "entries": [
+      {
+        "id": "release-candidate-workflow",
+        "date": "2026-07-24",
+        "type": "interface",
+        "title": "Довідник підготовлено як контрольований release candidate",
+        "summary": "Додано локальний тестовий звіт, приймальні сценарії, фінальний release gate і CI-перевірку синхронізації механік із правилами.",
+        "pages": [
+          "rule-changes",
+          "edition-version",
+          "accessibility"
+        ]
+      },
+      {
+        "id": "silent-page-turn",
+        "date": "2026-07-24",
+        "type": "interface",
+        "title": "Перегортання сторінок стало беззвучним",
+        "summary": "Звуки перегортання повністю вилучено. За бажанням окремо вмикаються лише тихі звуки відкриття та закриття книги.",
+        "pages": [
+          "accessibility"
+        ]
+      },
+      {
+        "id": "stable-page-turn",
+        "date": "2026-07-24",
+        "type": "interface",
+        "title": "Стабільне форматування під час перегортання",
+        "summary": "Розмір тексту, щільність верстки, діаграми та службові позначки більше не змінюються в середині анімації.",
+        "pages": [
+          "quick-overview",
+          "round-cycle"
+        ]
+      },
+      {
+        "id": "session-recovery-security",
+        "date": "2026-07-24",
+        "type": "rule",
+        "title": "Уточнено безпечне відновлення сеансу",
+        "summary": "Ведучий підтверджує запит, а новий сеанс видається лише один раз без секретів у URL.",
+        "pages": [
+          "session-recovery"
+        ]
+      },
+      {
+        "id": "seed-visibility",
+        "date": "2026-07-24",
+        "type": "rule",
+        "title": "Уточнено видимість seed",
+        "summary": "Під час активної партії seed прихований, а після фіналу може використовуватися для перевірки відтворюваності.",
+        "pages": [
+          "faq-first-game",
+          "edition-version"
+        ]
+      }
+    ]
+  },
+  "chapters": [
+    {
+      "id": "introduction",
+      "file": "content/00-introduction.md",
+      "part": "entry",
+      "order": 1,
+      "status": "canonical",
+      "metadata": {
+        "id": "introduction",
+        "title": "Про довідник",
+        "shortTitle": "Вступ",
+        "summary": "Як читати правила, обирати рівень деталізації та відрізняти канонічний текст від тимчасового.",
+        "audience": [
+          "all"
+        ],
+        "modes": [
+          "all"
+        ],
+        "status": "canonical",
+        "keywords": [
+          "довідник",
+          "зміст",
+          "статус правила",
+          "пошук"
+        ]
+      },
+      "anchors": [
+        "title-page",
+        "how-to-use",
+        "contents-overview"
+      ],
+      "markdown": "# Про довідник\n\n<a id=\"title-page\"></a>\n## СХОВИЩЕ — система формування групи виживання\n\n«СХОВИЩЕ» — браузерна дискусійна гра про формування громади після глобальної катастрофи. Гравці отримують персонажів із прихованими характеристиками, поступово розкривають інформацію, проходять кризи, виконують режимні дії та з’ясовують, чи здатна сформована група пережити наслідки катастрофи.\n\nЦей довідник описує версію гри 1.2.11. Він об’єднує короткий старт, правила для гравця, посібник ведучого, механіки режимів, фінальну оцінку, поширені питання та технічні пояснення. Для швидкої відповіді під час партії використовуйте контекстні кнопки «?», пошук або зміст.\n\n> **Головний принцип.** Інтерфейс показує дозволені дії поточної фази, а довідник пояснює їхній сенс, порядок і наслідки. Не виконуйте обхідну дію лише тому, що вона здається логічною поза інтерфейсом.\n\n<a id=\"how-to-use\"></a>\n## Як користуватися книгою\n\nДля першої партії прочитайте сторінки «Швидкий старт», «Особова справа», «Цикл раунду» та «Голосування». Ведучому додатково потрібні сторінки «Підготовка кімнати», «Командна панель» і «Відновлення сеансу».\n\nПозначки сторінок мають сталий зміст:\n\n- **Канонічне правило** — уже звірене з кодом, інтерфейсом і тестами.\n- **Уточнюється** — механіка працює, але формулювання або крайові випадки ще проходять P0-звірку.\n- **Довідка** — пояснювальний матеріал, який не створює нової механіки.\n- **Технічне** — інформація для супроводу, тестування або діагностики.\n\nФільтри «Гравець / Ведучий / Режим» скорочують зміст і пошук, але не змінюють нумерацію книги. Збільшення тексту може автоматично перевести довідник у односторінковий режим прокручування.\n\n<a id=\"contents-overview\"></a>\n## Структура\n\nКнига поділена на шість змістових частин:\n\n1. **Вхід до системи** — як приєднатися, підготуватися й почати.\n2. **Посібник гравця** — особова справа, фази, дії, кризи й голосування.\n3. **Механіки** — ресурси, медицина, операції, обмін і зовнішній табір.\n4. **Режими та результат** — відмінності форматів і три рівні фінального висновку.\n5. **Посібник ведучого** — запуск, контроль, автоматизація, recovery й приватність.\n6. **Довідкові матеріали** — терміни, FAQ, таблиці, доступність і версія правил.\n\nУ змісті кожна сторінка має сталий ідентифікатор. Саме на нього ведуть кнопки допомоги з екранів гри, тому переходи залишаються точними навіть після редакційних правок тексту."
+    },
+    {
+      "id": "quick-start",
+      "file": "content/01-quick-start.md",
+      "part": "entry",
+      "order": 2,
+      "status": "canonical",
+      "metadata": {
+        "id": "quick-start",
+        "title": "Швидкий старт",
+        "shortTitle": "Швидкий старт",
+        "summary": "Мінімальний набір дій від входу в кімнату до завершення першого раунду.",
+        "audience": [
+          "all"
+        ],
+        "modes": [
+          "all"
+        ],
+        "status": "canonical",
+        "keywords": [
+          "приєднання",
+          "лобі",
+          "готовність",
+          "перший раунд"
+        ]
+      },
+      "anchors": [
+        "quick-overview",
+        "join-room",
+        "lobby-ready",
+        "first-round"
+      ],
+      "markdown": "# Швидкий старт\n\n<a id=\"quick-overview\"></a>\n## Партія за одну хвилину\n\nВедучий створює кімнату й надсилає учасникам код. Кожен гравець приєднується під власним іменем, зберігає персональний код відновлення та підтверджує готовність у лобі. Після запуску система роздає персонажів і переводить групу до першої фази.\n\nТиповий цикл раунду:\n\n1. розкриття дозволеної інформації;\n2. обговорення й аргументація;\n3. криза або режимна задача;\n4. рішення, голосування чи операція;\n5. застосування наслідків і перехід до наступного раунду.\n\nГравцеві не потрібно запам’ятовувати всі режими наперед. Поточна вкладка «Хід» показує обов’язкову дію, а контекстна кнопка відкриває відповідну сторінку довідника.\n\n<a id=\"join-room\"></a>\n## Приєднання до кімнати\n\nНа стартовому екрані відкрийте блок «Приєднатися», введіть код кімнати та ім’я. Ім’я має відрізняти вас від інших учасників; не використовуйте токени, URL або службові значення як ім’я.\n\nПісля успішного входу збережіть персональний код, якщо інтерфейс його показує. Це не пароль від облікового запису, а засіб повернення саме до вашого персонажа. Не публікуйте токен сеансу й не передавайте його іншим гравцям.\n\nЯкщо браузер закрився, спершу скористайтеся звичайним повторним входом або персональним кодом. Recovery-запит створюйте лише тоді, коли попередній сеанс справді недоступний.\n\n<a id=\"lobby-ready\"></a>\n## Готовність у лобі\n\nПеред стартом перевірте:\n\n- своє ім’я та статус підключення;\n- вибраний режим і короткий опис цілі;\n- кількість учасників і місткість;\n- чи збережено персональний код;\n- чи немає попередження конфігуратора;\n- чи всі учасники натиснули «Готовий».\n\nПозначка готовності означає, що ви прочитали коротку ціль режиму й можете починати. Вона не означає, що ви погоджуєтеся з майбутніми рішеннями інших гравців. Ведучий повинен запускати партію лише тоді, коли система не показує блокувальних помилок.\n\n<a id=\"first-round\"></a>\n## Перший раунд\n\nПісля старту відкрийте вкладку «Хід». У першому раунді система може вимагати конкретну характеристику або дозволяти обрати одну з кількох. Підтвердьте вибір лише після того, як перевірите, що саме стане публічним.\n\nПісля розкриття коротко поясніть, чому ця характеристика допомагає групі або впливає на ризик. Не вигадуйте нове значення картки: блефувати можна щодо прихованих даних, але вже відкритий текст вважається спільною інформацією.\n\nДочекайтеся завершення дій інших учасників. Якщо кнопка переходу недоступна, відкрийте панель стану: там видно, хто ще не виконав обов’язкову дію й що саме блокує фазу."
+    },
+    {
+      "id": "player-guide",
+      "file": "content/02-player-guide.md",
+      "part": "player",
+      "order": 3,
+      "status": "provisional",
+      "metadata": {
+        "id": "player-guide",
+        "title": "Посібник гравця",
+        "shortTitle": "Гравцеві",
+        "summary": "Особова справа, прихована інформація, цикл раунду, кризи, голосування та санкції.",
+        "audience": [
+          "player"
+        ],
+        "modes": [
+          "all"
+        ],
+        "status": "provisional",
+        "keywords": [
+          "персонаж",
+          "характеристика",
+          "фаза",
+          "криза",
+          "голосування"
+        ]
+      },
+      "anchors": [
+        "dossier",
+        "hidden-and-open",
+        "round-cycle",
+        "required-actions",
+        "crisis",
+        "voting",
+        "sanctions"
+      ],
+      "markdown": "# Посібник гравця\n\n<a id=\"dossier\"></a>\n## Особова справа персонажа\n\nОсобова справа — ваш приватний ігровий профіль. Вона містить характеристики, здібність, статус у громаді та режимні відомості. Частина даних відкрита лише вам, частина вже внесена до загального протоколу, а окремі ролі можуть залишатися прихованими до фіналу.\n\nПеред кожною дією перевіряйте три речі: що саме дозволено розкрити, чи є дія обов’язковою та який наслідок матиме підтвердження. Після публікації характеристика стає спільною інформацією і може використовуватися в аргументації, кризах та фінальній оцінці.\n\nЗдібність оформлена окремим модулем. Її текст має пріоритет над загальною інтуїцією, але не скасовує серверні обмеження фази, цілі або кількості використань.\n\n<a id=\"hidden-and-open\"></a>\n## Приховані й відкриті дані\n\n**Приховане** бачить лише власник персонажа або спеціально уповноважена роль. **Відкрите** бачить уся група й може перевірити в загальному стані. **Засекречене до фіналу** не повинно передаватися через чат, скриншот або сторонню домовленість.\n\nПід час обговорення дозволено будувати аргументи навколо прихованої інформації, не розкриваючи її дослівно. Однак не можна стверджувати, що система вже підтвердила те, чого в загальному протоколі немає.\n\nКоли сторінка показує «Приховано», це не порожнє поле й не помилка завантаження. Значення існує, але політика видимості ще не дозволяє його оприлюднити.\n\n<a id=\"round-cycle\"></a>\n## Цикл раунду\n\nФази проходять у визначеному порядку. Конкретний режим може пропускати або додавати кроки, але кожна дія завжди належить поточній фазі.\n\n- **Розкриття** — публікація дозволених характеристик.\n- **Обговорення / планування** — аргументи, координація та підготовка рішення.\n- **Криза / подія** — групова проблема з доступними варіантами.\n- **Рішення** — голосування, операція, звинувачення або інша режимна дія.\n- **Наслідки** — сервер застосовує результат один раз і оновлює стан.\n\nНе надсилайте одну дію повторно через кілька вкладок. Якщо відповідь затрималась, дочекайтеся оновлення стану або скористайтеся безпечним повторним запитом інтерфейсу.\n\n<a id=\"required-actions\"></a>\n## Обов’язкові дії й очікування\n\nОбов’язкова дія позначається у вкладці «Хід» і в панелі готовності групи. Поки її не виконано, перехід може залишатися заблокованим. Ведучий бачить список учасників зі станами «очікує», «виконав», «офлайн» або «не бере участі в цій фазі».\n\nЯкщо ви не можете діяти, перевірте:\n\n1. чи відкрито правильну кімнату;\n2. чи не завершилась фаза;\n3. чи має ваш персонаж право на цю дію;\n4. чи не було дію вже прийнято;\n5. чи відновився зв’язок після короткого офлайну.\n\nСлужбове очікування не дає права іншому гравцеві діяти від вашого імені.\n\n<a id=\"crisis\"></a>\n## Криза\n\nКриза — це формалізована проблема раунду. Інтерфейс показує опис, доступні рішення, умови участі й те, чи є вибір колективним або персональним. Спершу прочитайте наслідки кожного варіанта, потім обговорюйте переваги.\n\nРішення в кризі застосовується лише через передбачену дію. Повідомлення в чаті, усна домовленість або голос «для настрою» не змінюють стан гри. Після підтвердження система фіксує вибір і не повинна застосовувати наслідок удруге.\n\n> **Уточнюється:** для окремих криз ще звіряються право фінального вибору, поведінка нічиєї й можливість ведучого завершити фазу за неповної участі.\n\n<a id=\"voting\"></a>\n## Голосування і трибунал\n\nГолосування складається з трьох кроків: вибір дозволеної цілі, підтвердження голосу та підрахунок після завершення прийому. До моменту підрахунку інтерфейс може дозволяти зміну голосу; після фіксації результату звичайне редагування недоступне.\n\nТаємність залежить від режиму. У відкритому голосуванні учасники можуть бачити вибір одразу. У таємному — лише факт виконання дії, а зміст відкривається після завершення. Не використовуйте технічні засоби для дострокового розкриття чужого голосу.\n\nЯкщо виникла **нічия**, застосовується правило, вибране в налаштуваннях кімнати: переголосування, відсутність санкції або інший явно показаний варіант. Ведучий не повинен замінювати його імпровізованим рішенням.\n\n<a id=\"sanctions\"></a>\n## Санкції та наслідки рішення\n\nСанкція — формальний наслідок рішення ради. Вона може означати вигнання, тимчасове обмеження, втрату права на дію або інший режимний ефект. Назва санкції, її тривалість і вплив мають бути показані до підтвердження, якщо правила не вимагають прихованого результату.\n\nВигнаний персонаж не обов’язково вибуває з усіх механік. У режимах із зовнішнім табором, апеляцією або спеціальними ролями він може отримати інший набір дій. Водночас він більше не користується перевагами основної групи без прямого дозволу правила.\n\n> **Уточнюється:** крайові випадки одночасних санкцій, апеляції та їхнього впливу на місткість остаточно звіряються у механічному P0-пакеті."
+    },
+    {
+      "id": "mechanics",
+      "file": "content/03-mechanics.md",
+      "part": "mechanics",
+      "order": 4,
+      "status": "provisional",
+      "metadata": {
+        "id": "mechanics",
+        "title": "Механіки виживання",
+        "shortTitle": "Механіки",
+        "summary": "Ресурси, медицина, операції, обмін предметами й зовнішній табір.",
+        "audience": [
+          "player",
+          "host"
+        ],
+        "modes": [
+          "survival",
+          "advanced"
+        ],
+        "status": "provisional",
+        "keywords": [
+          "ресурси",
+          "медицина",
+          "операції",
+          "обмін",
+          "зовнішній табір"
+        ]
+      },
+      "anchors": [
+        "resources",
+        "medicine",
+        "operations",
+        "trade",
+        "outside-camp"
+      ],
+      "markdown": "# Механіки виживання\n\n<a id=\"resources\"></a>\n## Ресурси сховища\n\nРесурси показують здатність громади підтримувати життя та виконувати складні дії. Кожна категорія має числове значення й зрозумілий стан: стабільно, напружено, критично або вичерпано. Ведучий може бачити точніші службові причини зміни, тоді як гравцям достатньо наслідку для рішення.\n\nЗначення змінюються лише після підтвердженої події, операції або наслідку. Одна й та сама подія не повинна списувати ресурс двічі. Якщо показник став критичним, відкрийте його пояснення: там зазначено, які дії заблоковані й що може відновити запас.\n\n> **Уточнюється:** нульове значення життєво критичного ресурсу, порядок блокування фіналу й взаємодія з довгостроковим прогнозом ще проходять P0-звірку.\n\n<a id=\"medicine\"></a>\n## Медицина\n\nМедична дія має чотири складники: виконавець, ціль, засіб і очікуваний результат. Наявність медичної професії або предмета сама по собі не лікує стан — потрібна доступна дія у відповідній фазі.\n\nПеред підтвердженням перевірте:\n\n- чи потребує ціль допомоги;\n- чи доступний засіб не витрачено раніше;\n- чи має виконавець потрібну компетенцію;\n- чи дія не конфліктує з іншою обов’язковою операцією;\n- який стан залишиться після лікування.\n\n> **Уточнюється:** точні ваги станів здоров’я, ефект догляду й наслідок невиконаної допомоги ще не канонізовані.\n\n<a id=\"operations\"></a>\n## Операції, ремонт і експедиції\n\nОперація — практичний внесок персонажа в спільну задачу. Система показує доступні цілі, потрібні компетенції, ризик і можливу винагороду. Учасник обирає задачу, підтверджує внесок, після чого сервер один раз застосовує результат.\n\nРемонт відновлює конкретну систему або зменшує її аварійність. Експедиція може витратити ресурс, створити ризик травми та принести предмет чи інформацію. Планування не дорівнює виконанню: домовленість групи стає механічним результатом лише після підтвердженої дії.\n\nЯкщо кілька учасників працюють над однією задачею, інтерфейс повинен явно показати, чи їхній внесок підсумовується, чи враховується лише один виконавець.\n\n<a id=\"trade\"></a>\n## Обмін предметами\n\nОбмін доступний лише тоді, коли модуль активний і обидві сторони мають право взаємодіяти. Передавання має містити відправника, одержувача, конкретний предмет і підтвердження.\n\nПредмет не можна використати й передати одночасно. Після успішного обміну він зникає з інвентарю відправника та з’являється в одержувача в межах однієї атомарної зміни. Якщо дія не завершилась, інтерфейс не повинен показувати предмет у двох місцях.\n\nОбіцянки, борги й політичні домовленості можуть бути частиною дискусії, але вони не створюють автоматичного серверного зобов’язання, якщо окремий модуль угод не ввімкнено.\n\n<a id=\"outside-camp\"></a>\n## Зовнішній табір\n\nВигнаний персонаж може перейти до зовнішньої групи замість повного вибуття, якщо це дозволяє конфігурація. Зовнішній табір має власні обмежені ресурси, ризики та дії. Його учасники не користуються системами основного сховища без прямого правила.\n\nТиповий цикл зовнішньої ролі: отримати доступну дію, обрати ціль, підтвердити її до завершення фази й дочекатися наслідку. Зовнішній персонаж може впливати на інформацію, торгівлю, апеляцію або довгостроковий результат залежно від активного модуля.\n\n> **Уточнюється:** апеляція, формальні угоди, кількість зовнішніх дій і вплив табору на фінал ще потребують остаточної P0-звірки."
+    },
+    {
+      "id": "modes",
+      "file": "content/04-modes.md",
+      "part": "modes",
+      "order": 5,
+      "status": "provisional",
+      "metadata": {
+        "id": "modes",
+        "title": "Режими гри",
+        "shortTitle": "Режими",
+        "summary": "Відмінності циклів, голосувань, ролей і результатів у п’яти основних форматах.",
+        "audience": [
+          "player",
+          "host"
+        ],
+        "modes": [
+          "all"
+        ],
+        "status": "provisional",
+        "keywords": [
+          "класичний",
+          "виживання",
+          "фракції",
+          "детектив",
+          "розширений"
+        ]
+      },
+      "anchors": [
+        "classic-mode",
+        "survival-mode",
+        "factions-mode",
+        "detective-mode",
+        "advanced-mode",
+        "module-compatibility"
+      ],
+      "markdown": "# Режими гри\n\n<a id=\"classic-mode\"></a>\n## Класичний відбір\n\nКласичний режим зосереджений на соціальному відборі. Гравці поступово розкривають персонажів, обговорюють користь і ризики, проходять кризу та ухвалюють рішення ради. Особиста мета — залишитися у фінальній групі, не зруйнувавши її здатність до виживання.\n\nПеред стартом ведучий перевіряє місткість, кількість раундів, систему голосування та правило нічиєї. Після кожної санкції склад кандидатів оновлюється, а відкриті характеристики залишаються частиною протоколу.\n\n> **Уточнюється:** остаточний пріоритет місткості над лімітом раундів і поведінка переповненої фінальної групи.\n\n<a id=\"survival-mode\"></a>\n## Спільне виживання\n\nЦе кооперативний режим без обов’язкового вигнання. Команда планує дії, виконує операції, розподіляє ресурси, проходить кризи й намагається стабілізувати громаду. Рішення можуть створювати персональні ризики, але основний результат залишається груповим.\n\nУчасники мають координувати компетенції: одна характеристика може бути сильною в кризі, інша — у ремонті або медицині. Фінал окремо показує стан громади та особисті цілі, тому успіх групи не гарантує однакового персонального результату всім.\n\n<a id=\"factions-mode\"></a>\n## Фракції та зрадники\n\nРежим додає приховані ролі, переговори, інтриги й таємне голосування. Гравець може одночасно підтримувати виживання громади та переслідувати фракційну мету. Рольова інформація залишається приватною до моменту, визначеного правилами.\n\nНе вважайте підозру доказом. Інтерфейс окремо показує підтверджені факти, відкриті характеристики й результати формальних дій. Фінальний звіт розділяє груповий, особистий і рольовий результати, щоб прихована перемога не підміняла стан громади.\n\n<a id=\"detective-mode\"></a>\n## Детектив\n\nДетективний цикл включає розкриття, розслідування, кризу, формальне звинувачення та наслідки. Учасники збирають ланки доказів, перевіряють версії та вирішують, коли достатньо підстав для обвинувачення.\n\nФормальне звинувачення відрізняється від дискусійної підозри: воно має вказувати дозволену ціль і використовує накопичений доказовий стан. Після вердикту гра повинна пояснити, які ланки підтверджено та чому розслідування вважається успішним або проваленим.\n\n> **Уточнюється:** доказовий поріг, фінальний вердикт і співвідношення ролей справи.\n\n<a id=\"advanced-mode\"></a>\n## Розширена гра\n\nРозширений режим поєднує базовий цикл із додатковими модулями. Рекомендовано вмикати не більше двох складних модулів одночасно, щоб фази залишалися зрозумілими, а партія не перетворювалася на набір несумісних підсистем.\n\nПеред стартом конфігуратор перевіряє, чи мають модулі потрібні фази, цілі та спосіб завершення. Якщо комбінація позначена як експериментальна, ведучий повинен прочитати попередження й не використовувати автоматичне ведення без окремої підтримки.\n\n> **Уточнюється:** остаточна матриця сумісності та порядок модульних фаз.\n\n<a id=\"module-compatibility\"></a>\n## Сумісність модулів\n\nМодулі вважаються сумісними, коли вони не претендують на одну й ту саму фазу з різними правилами, не створюють суперечливих цілей і мають однозначний фінальний підрахунок.\n\nПеред запуском перевірте:\n\n- чи кожна дія має фазу виконання;\n- чи є зрозуміла черговість ефектів;\n- чи не дублюється один ресурс під двома назвами;\n- чи зовнішні ролі мають право на участь у голосуванні;\n- чи автоматизація підтримує всю комбінацію;\n- чи фінал пояснює кожен активний модуль.\n\nНепідтримувану комбінацію конфігуратор повинен заблокувати, а не запускати з мовчазно вимкненим правилом."
+    },
+    {
+      "id": "results",
+      "file": "content/05-results.md",
+      "part": "modes",
+      "order": 6,
+      "status": "provisional",
+      "metadata": {
+        "id": "results",
+        "title": "Результат і фінал",
+        "shortTitle": "Фінал",
+        "summary": "Три рівні результату, момент завершення й читання фінального звіту.",
+        "audience": [
+          "player",
+          "host"
+        ],
+        "modes": [
+          "all"
+        ],
+        "status": "provisional",
+        "keywords": [
+          "перемога",
+          "фінал",
+          "оцінка громади",
+          "особиста мета",
+          "роль"
+        ]
+      },
+      "anchors": [
+        "victory-layers",
+        "final-trigger",
+        "final-report"
+      ],
+      "markdown": "# Результат і фінал\n\n<a id=\"victory-layers\"></a>\n## Три рівні результату\n\nФінальний висновок розділений на незалежні шари:\n\n1. **Груповий результат** — чи виконала громада спільну умову режиму.\n2. **Особистий результат** — чи виконав конкретний персонаж персональну мету.\n3. **Спеціальний результат** — фракція, прихована роль, детективна справа або модульна умова.\n\nОдин шар не повинен непомітно підміняти інший. Персонаж може програти особисто в успішній громаді або виконати рольову мету в групі, яка не пережила катастрофу. Саме тому фінальний екран показує окремі картки, а не одне універсальне слово «перемога».\n\n<a id=\"final-trigger\"></a>\n## Коли настає фінал\n\nФінал запускається умовою режиму: завершенням ліміту раундів, досягненням визначеної місткості, формальним вердиктом або іншим явно показаним тригером. Після створення фінального стану звичайні раундові дії більше не приймаються, а повторний запит не повинен формувати другий результат.\n\n> **Уточнюється:** пріоритет кількох одночасних тригерів і крайові випадки переповнення ще проходять P0-звірку.\n\n<a id=\"final-report\"></a>\n## Як читати фінальний звіт\n\nСпочатку прочитайте груповий висновок і перелік критичних причин. Потім перегляньте персональні цілі кожного персонажа. Лише після цього відкривайте спеціальні ролі, фракції та довгостроковий прогноз.\n\nФінальний звіт повинен пояснювати:\n\n- що саме завершило партію;\n- які умови виконано або провалено;\n- які ресурси чи системи були критичними;\n- які персональні цілі зараховано;\n- як спрацювали спеціальні ролі;\n- які дані не впливали на основний результат, а лише формували прогноз.\n\n> **Уточнюється:** фінальна формула, критичні блокування та захист від подвійного врахування показників."
+    },
+    {
+      "id": "host-guide",
+      "file": "content/06-host-guide.md",
+      "part": "host",
+      "order": 7,
+      "status": "canonical",
+      "metadata": {
+        "id": "host-guide",
+        "title": "Посібник ведучого",
+        "shortTitle": "Ведучому",
+        "summary": "Створення кімнати, керування партією, автоматизація, відновлення сеансів і приватність.",
+        "audience": [
+          "host"
+        ],
+        "modes": [
+          "all"
+        ],
+        "status": "canonical",
+        "keywords": [
+          "ведучий",
+          "створення кімнати",
+          "автоматизація",
+          "recovery",
+          "seed"
+        ]
+      },
+      "anchors": [
+        "host-preparation",
+        "host-command",
+        "automation",
+        "session-recovery",
+        "host-troubleshooting",
+        "privacy-and-seed"
+      ],
+      "markdown": "# Посібник ведучого\n\n<a id=\"host-preparation\"></a>\n## Підготовка кімнати\n\nОберіть готовий пресет або налаштуйте режим вручну. Перед створенням перевірте кількість учасників, місткість, ліміт раундів, систему голосування, правило нічиєї, рівень автоматизації та активні модулі.\n\nКонфігураційне попередження не є декоративною підказкою. Якщо воно блокує старт, виправте параметри. Якщо воно лише попереджає про складність, поясніть учасникам відмінність режиму до того, як вони підтвердять готовність.\n\nЗаздалегідь домовтеся про темп, допустиму тривалість обговорення та спосіб вирішення суто рольових суперечок, які сервер не моделює.\n\n<a id=\"host-command\"></a>\n## Командна панель\n\nКомандна панель відповідає на три питання: хто ще не виконав дію, що блокує перехід і яка наступна дозволена команда. Основний контроль партії має бути відділений від системних параметрів, щоб ведучий не змінював налаштування випадково під час ходу.\n\nПеред переходом фази перевірте статуси учасників. Якщо гравець офлайн, дайте йому час на повернення або скористайтеся передбаченим правилом продовження. Не підтверджуйте наслідок вручну, якщо сервер ще приймає обов’язкові дії.\n\n<a id=\"automation\"></a>\n## Автоматизація\n\n- **Ручне ведення** — кожен перехід підтверджує ведучий.\n- **Допоміжний режим** — система показує наступну дію й попереджає про простій.\n- **Автоматичний ведучий** — переходить прості фази без ручного втручання, але не вирішує соціальні дилеми за людей.\n\nАвтоматизація повинна бути передбачуваною. Вона не має змінювати голос, обирати неоднозначну кризову відповідь або застосовувати складну санкцію без окремого правила. Для експериментальних модулів використовуйте ручний або допоміжний режим.\n\n<a id=\"session-recovery\"></a>\n## Відновлення сеансу\n\nГравець, який втратив доступ, створює recovery-запит. Ведучий перевіряє ім’я, персонажа й обставини, після чого схвалює або відхиляє запит. Схвалення ще не передає токен напряму: гравець окремо виконує одноразовий claim і отримує новий сеанс.\n\nБезпечний порядок:\n\n1. гравець створює запит;\n2. передає ведучому лише код запиту;\n3. ведучий звіряє персонажа;\n4. схвалює запит;\n5. гравець отримує новий сеанс один раз;\n6. виданий секрет очищається з recovery-стану.\n\nНе просіть надсилати токен у чаті й не додавайте recovery-секрет до URL.\n\n<a id=\"host-troubleshooting\"></a>\n## Типові проблеми\n\n**Фаза не переходить.** Відкрийте список обов’язкових дій і знайдіть статус «очікує».\n\n**Гравець офлайн.** Перевірте runtime-статус, дайте час на повторний вхід і лише потім запускайте recovery.\n\n**Кнопка недоступна.** Переконайтеся, що ви ведучий, фаза не завершилась і конфігурація дозволяє дію.\n\n**Стан не оновився.** Не натискайте дію багато разів. Оновіть публічний стан або перевірте повідомлення про помилку.\n\n**Після деплою зникли дані.** Не створюйте нову кімнату поверх проблеми; перевірте readiness, persistent storage і резервні копії.\n\n<a id=\"privacy-and-seed\"></a>\n## Приватність і seed\n\nSeed бачить лише ведучий у лобі. Після запуску він приховується від усіх, включно з ведучим, і відкривається після фіналу для перевірки відтворюваності. Не публікуйте seed до завершення — він може дозволити відтворити стартову роздачу.\n\nТокени гравців, recovery-секрети та службові дані сховища не належать до публічного стану. Вони не повинні з’являтися в URL, журналі партії, скриншотах або довіднику. Для підтримки достатньо коду кімнати, версії гри, назви фази й безпечного тексту помилки."
+    },
+    {
+      "id": "reference",
+      "file": "content/07-reference.md",
+      "part": "reference",
+      "order": 8,
+      "status": "reference",
+      "metadata": {
+        "id": "reference",
+        "title": "Довідкові матеріали",
+        "shortTitle": "Довідка",
+        "summary": "Термінологія, короткі відповіді, фази й типові дії.",
+        "audience": [
+          "all"
+        ],
+        "modes": [
+          "all"
+        ],
+        "status": "reference",
+        "keywords": [
+          "терміни",
+          "FAQ",
+          "фази",
+          "дії",
+          "доступність"
+        ]
+      },
+      "anchors": [
+        "glossary-a-m",
+        "glossary-n-z",
+        "faq-first-game",
+        "faq-disputes",
+        "phase-reference",
+        "action-reference",
+        "rule-changes",
+        "accessibility"
+      ],
+      "markdown": "# Довідкові матеріали\n\n<a id=\"glossary-a-m\"></a>\n## Термінологія: А–М\n\n**Автоматизація** — рівень самостійного переходу фаз системою.\n\n**Ведучий** — учасник із правом створювати кімнату й керувати переходами.\n\n**Відкрита характеристика** — частина досьє, внесена до загального протоколу.\n\n**Груповий результат** — спільний висновок про стан громади.\n\n**Криза** — формалізована проблема з визначеними варіантами рішення.\n\n**Місткість** — гранична кількість персонажів у цільовій групі.\n\nКанонічні назви й дозволені синоніми зберігаються у `terminology.json`. Пошук враховує обидва варіанти, але текст правил використовує основну назву.\n\n<a id=\"glossary-n-z\"></a>\n## Термінологія: Н–Я\n\n**Наслідки** — фаза, у якій сервер застосовує вже прийняті рішення.\n\n**Особиста мета** — індивідуальна умова персонажа.\n\n**Публічний стан** — безпечна частина кімнати, доступна клієнту з урахуванням ролі.\n\n**Recovery** — контрольоване відновлення втраченого сеансу.\n\n**Санкція** — формальний наслідок рішення ради.\n\n**Seed** — значення, що робить генерацію відтворюваною.\n\n**Фаза** — відрізок циклу з власним набором дозволених дій.\n\n**Хід** — поточне завдання конкретного учасника.\n\n<a id=\"faq-first-game\"></a>\n## FAQ: перша партія\n\n**Де моя дія?** На вкладці «Хід» або в картці поточної фази.\n\n**Чи можна змінити розкриття?** Після підтвердження — ні, якщо окрема здібність не каже інакше.\n\n**Чи можна змінити голос?** До підрахунку — лише якщо інтерфейс залишає таку можливість.\n\n**Чому я не бачу seed?** Під час активної партії він навмисно прихований.\n\n**Чому кнопка сіра?** Дія недоступна у цій фазі, вже виконана або потребує іншої ролі.\n\n**Чи можна грати після відключення?** Поверніться через персональний код або recovery-процедуру.\n\n<a id=\"faq-disputes\"></a>\n## FAQ: суперечки\n\nСпершу відкрийте контекстне правило конкретної дії. Потім перевірте поточний режим, активні модулі й статус сторінки. Якщо сторінка позначена «Уточнюється», орієнтуйтеся на фактичні дозволені дії інтерфейсу й зафіксуйте крайовий випадок для аудиту.\n\nНе створюйте усне правило, яке змінює серверний стан. Для якісного звіту достатньо версії гри, коду кімнати без секретів, назви фази, послідовності дій та тексту помилки.\n\n<a id=\"phase-reference\"></a>\n## Коротка таблиця фаз\n\n- **Лобі** — приєднання, готовність, перевірка конфігурації.\n- **Розкриття** — публікація характеристик.\n- **Обговорення / планування** — координація без негайного ефекту.\n- **Подія / криза** — вибір реакції на проблему.\n- **Операції** — практичні дії, ремонт, експедиції.\n- **Голосування / звинувачення** — формальне колективне рішення.\n- **Кінець раунду** — підсумок і підготовка наступного циклу.\n- **Фінал** — звичайні раундові дії більше не приймаються.\n\n<a id=\"action-reference\"></a>\n## Коротка таблиця дій\n\nКожна дія має виконавця, ціль, умови доступу, обов’язковість і момент застосування. Перед натисканням перевірте назву цілі та наслідок. Після підтвердження дочекайтеся відповіді сервера.\n\nТипові дії: готовність, старт, розкриття, голос події, завершення події, голосування за санкцію, перехід фази, операція, обмін, лікування, recovery-запит і одноразове отримання нового сеансу.\n\nПовторне надсилання не повинно створювати подвійний ефект. Якщо клієнт не впевнений у результаті, він має перечитати стан, а не сліпо повторювати запис.\n\n<a id=\"rule-changes\"></a>\n## Зміни правил\n\nГравецький журнал змін містить лише те, що впливає на рішення під час партії: зміну голосування, нового режимного кроку, інший критерій фіналу або уточнення доступної дії.\n\nТехнічні зміни — CI, Docker, безпечне збереження, внутрішній формат токенів — залишаються в загальному `CHANGELOG.md`, якщо вони не змінюють поведінку гравця.\n\nОновлена сторінка може тимчасово мати позначку «Оновлено». Версія довідника показується окремо від версії продукту, щоб було видно, чи синхронізовано текст із релізом.\n\n<a id=\"accessibility\"></a>\n## Доступність\n\nДовідник підтримує клавіатуру, видимий focus, закриття через `Esc`, повернення фокуса до кнопки відкриття, оголошення сторінок екранним читачем і режим без анімації.\n\nУ налаштуваннях читання можна змінити розмір тексту, міжрядковий інтервал, контраст, підказки й тип перегортання. За великих масштабів книга автоматично переходить до однієї сторінки з прокручуванням.\n\nПерегортання сторінок завжди беззвучне. Необов’язкові звуки відкриття й закриття книги вимкнені за замовчуванням і не передають важливої інформації."
+    },
+    {
+      "id": "edition",
+      "file": "content/08-edition.md",
+      "part": "reference",
+      "order": 9,
+      "status": "technical",
+      "metadata": {
+        "id": "edition",
+        "title": "Видання і версія",
+        "shortTitle": "Версія",
+        "summary": "Версії продукту, правил і структури книги; правила оновлення канонічного тексту.",
+        "audience": [
+          "technical"
+        ],
+        "modes": [
+          "all"
+        ],
+        "status": "technical",
+        "keywords": [
+          "версія",
+          "схема",
+          "оновлення",
+          "канон"
+        ]
+      },
+      "anchors": [
+        "edition-version",
+        "canonical-update"
+      ],
+      "markdown": "# Видання і версія\n\n<a id=\"edition-version\"></a>\n## Поточне видання\n\n- Продукт: `1.2.11`\n- Маніфест: `rulebook-manifest-v1`\n- Runtime schema: `rulebook-runtime-v1`\n- Карта книги: `rulebook-book-map-v1`\n- Версія довідника: `0.8.0-rc.1`\n- Мова: `uk-UA`\n\nRuntime bundle збирається детерміновано з файлів `docs/rulebook`. SHA-256 digest дозволяє перевірити редакцію, а локальний fallback відкриває ту саму перевірену версію, якщо окремий JSON-запит недоступний.\n\n<a id=\"canonical-update\"></a>\n## Правило оновлення\n\nМеханічний PR вважається повним лише після синхронізації п’яти шарів: коду, тестів, інтерфейсу, відповідної сторінки довідника та журналу змін правил.\n\nСторінка зі статусом `provisional` не публікується як остаточна редакція без повторної звірки. При зміні ID сторінки потрібно оновити контекстні переходи, закладки, пошуковий індекс і тест цілісності внутрішніх посилань.\n\nДовідник не завантажує зовнішній HTML, не виконує скрипти з Markdown і не містить приватних токенів кімнати."
+    }
+  ],
+  "contentDigest": "46ea30bdf7cafaec43858038f2d5661154235f71340c93d3f2bb10d4e3610247"
+}

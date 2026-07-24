@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 190" role="img" aria-labelledby="t d">
+<title id="t">Панель ресурсів сховища</title><desc id="d">Вода, енергія, медицина і мораль показані як окремі шкали стану.</desc>
+<g font-family="system-ui,sans-serif">
+<g fill="#4c4437" font-size="14" font-weight="800"><text x="36" y="39">ВОДА</text><text x="36" y="79">ЕНЕРГІЯ</text><text x="36" y="119">МЕДИЦИНА</text><text x="36" y="159">МОРАЛЬ</text></g>
+<g fill="#ddd1b8"><rect x="155" y="25" width="440" height="16" rx="8"/><rect x="155" y="65" width="440" height="16" rx="8"/><rect x="155" y="105" width="440" height="16" rx="8"/><rect x="155" y="145" width="440" height="16" rx="8"/></g>
+<rect x="155" y="25" width="326" height="16" rx="8" fill="#648f72"/><rect x="155" y="65" width="263" height="16" rx="8" fill="#668c98"/><rect x="155" y="105" width="208" height="16" rx="8" fill="#d49a2e"/><rect x="155" y="145" width="138" height="16" rx="8" fill="#b85a4c"/>
+<g fill="#72531e" font-size="12" font-weight="750" text-anchor="end"><text x="612" y="39">СТАБІЛЬНО</text><text x="612" y="79">ДОСТАТНЬО</text><text x="612" y="119">НАПРУЖЕНО</text><text x="612" y="159">КРИТИЧНО</text></g>
+</g></svg>

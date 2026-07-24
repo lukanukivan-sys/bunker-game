@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 190" role="img" aria-labelledby="t d">
+<title id="t">Безпечне відновлення сеансу</title><desc id="d">Запит гравця проходить перевірку ведучим, після чого одноразово видається новий сеанс.</desc>
+<g font-family="system-ui,sans-serif" text-anchor="middle">
+<path d="M152 94h92M396 94h92" fill="none" stroke="#738188" stroke-width="2.5" stroke-linecap="round"/>
+<path d="m232 86 16 8-16 8M476 86l16 8-16 8" fill="none" stroke="#738188" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+<g stroke="#806b48" stroke-width="2"><circle cx="98" cy="94" r="50" fill="#e9dec5"/><circle cx="320" cy="94" r="58" fill="#e6a72f"/><circle cx="542" cy="94" r="50" fill="#c9ddce"/></g>
+<g fill="#373128" font-size="13.5" font-weight="800"><text x="98" y="89">ЗАПИТ</text><text x="98" y="108">ГРАВЦЯ</text><text x="320" y="89">ПЕРЕВІРКА</text><text x="320" y="108">ВЕДУЧОГО</text><text x="542" y="89">НОВИЙ СЕАНС</text><text x="542" y="108">ОДИН РАЗ</text></g>
+</g></svg>

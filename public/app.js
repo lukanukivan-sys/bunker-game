@@ -560,6 +560,21 @@ function renderCurrentAction() {
   $("currentActionPanel").setAttribute("role", "tabpanel");
   $("currentActionSteps").innerHTML = (model.steps || []).map((step) => `<span class="current-action-step ${escapeHtml(step.state || "pending")}">${escapeHtml(step.label)}</span>`).join("");
   $("currentActionShortcut").textContent = model.button || "Перейти до дії";
+  const rulebookPageByPhase = {
+    reveal: "hidden-open",
+    discussion: "round-cycle",
+    planning: "operations",
+    negotiation: "trade",
+    intrigue: "factions-mode",
+    investigation: "detective-mode",
+    operations: "operations",
+    event: "crisis",
+    elimination: "voting",
+    round_end: "round-cycle",
+    final: "final-report"
+  };
+  const rulebookButton = $("currentActionRulebookButton");
+  if (rulebookButton) rulebookButton.dataset.rulebookOpen = rulebookPageByPhase[state.game?.phase] || "round-cycle";
   $("currentActionShortcut").onclick = () => {
     selectGameTab(model.targetTab || "turn");
     const target = model.targetElement ? $(model.targetElement) : model.targetTab === "character" ? $("privateCharacter") : model.targetTab === "investigation" ? $("detectivePanel") : model.targetTab === "group" ? $("publicPlayers") : model.targetTab === "shelter" ? $("resources") : model.targetTab === "log" ? $("gameLog") : $("primaryActionPanel");
@@ -988,18 +1003,29 @@ function randomGenerationSeed() {
   crypto.getRandomValues(bytes);
   return [0, 1, 2].map((group) => [0, 1, 2, 3].map((offset) => alphabet[bytes[group * 4 + offset] % alphabet.length]).join("")).join("-");
 }
+function generationSeedDisplay(generation) {
+  if (generation?.seedVisible && generation.seed) return generation.seed;
+  if (generation?.seedVisibility === "hidden-active-game") return "Приховано до фіналу";
+  if (generation?.seedVisibility === "host-only") return "Доступно лише хосту";
+  return "—";
+}
 function renderGenerationPanel(scope = "lobby") {
   const generation = state?.generation;
   if (!generation) return;
+  const seedText = generationSeedDisplay(generation);
   if (scope === "lobby") {
-    $("lobbyGenerationSeedValue").textContent = generation.seed || "—";
+    $("lobbyGenerationSeedValue").textContent = seedText;
     $("lobbyGenerationConfigCode").textContent = generation.configCode || "—";
     $("lobbyGenerationSchema").textContent = generation.schema || "—";
     $("lobbyGenerationFingerprintCard").classList.toggle("hidden", !generation.fingerprint);
     $("lobbyGenerationFingerprint").textContent = generation.fingerprint || "—";
     $("lobbyGenerationNote").textContent = generation.note || "";
+    if ($("lobbyCopyGenerationSeed")) {
+      $("lobbyCopyGenerationSeed").disabled = !generation.seedVisible || !generation.seed;
+      $("lobbyCopyGenerationSeed").classList.toggle("hidden", !generation.seedVisible || !generation.seed);
+    }
   } else {
-    $("gameGenerationSeedValue").textContent = generation.seed || "—";
+    $("gameGenerationSeedValue").textContent = seedText;
     $("gameGenerationConfigCode").textContent = generation.configCode || "—";
     $("gameGenerationFingerprint").textContent = generation.fingerprint || "—";
     $("gameGenerationPanel").classList.toggle("generation-migrated", generation.reproducible === false);
@@ -2281,7 +2307,7 @@ $("lobbyCopyGenerationConfig")?.addEventListener("click", () => copyGenerationVa
 $("gameCopyGenerationBundle")?.addEventListener("click", () => {
   const generation = state?.generation;
   if (!generation) return;
-  copyGenerationValue(`Seed: ${generation.seed}
+  copyGenerationValue(`Seed: ${generationSeedDisplay(generation)}
 Схема: ${generation.schema}
 Конфігурація: ${generation.configCode}
 Відбиток: ${generation.fingerprint || "—"}`, "Дані генерації");
@@ -2356,29 +2382,42 @@ $("joinForm").addEventListener("submit", async (event) => {
     startPolling();
   } catch (error) { toast(error.message, true); }
 });
+async function claimRecoveryRequest(requestData) {
+  return api("/api/rooms/recovery-claim", {
+    method: "POST",
+    headers: { "X-Recovery-Request-Token": requestData.requestToken },
+    body: { code: requestData.code, requestId: requestData.requestId }
+  });
+}
 async function pollRecoveryRequestStatus(requestData) {
   clearInterval(recoveryPollTimer);
   const statusElement = $("recoveryRequestStatus");
   const check = async () => {
     try {
-      const payload = await api(`/api/rooms/recovery-status?code=${encodeURIComponent(requestData.code)}&requestId=${encodeURIComponent(requestData.requestId)}&requestToken=${encodeURIComponent(requestData.requestToken)}`);
+      const query = new URLSearchParams({ code: requestData.code, requestId: requestData.requestId });
+      const payload = await api(`/api/rooms/recovery-status?${query}`, {
+        headers: { "X-Recovery-Request-Token": requestData.requestToken }
+      });
       if (payload.status === "approved") {
+        const claimed = await claimRecoveryRequest(requestData);
         clearInterval(recoveryPollTimer);
         localStorage.removeItem("shelter100-recovery-request");
-        saveSession({ code: payload.code, playerId: payload.playerId, token: payload.token, recoveryCode: payload.recoveryCode || null });
-        if (statusElement) statusElement.textContent = `Хост підтвердив повернення ${payload.name || "гравця"}.`;
+        saveSession({ code: claimed.code, playerId: claimed.playerId, token: claimed.token, recoveryCode: claimed.recoveryCode || null });
+        if (statusElement) statusElement.textContent = `Хост підтвердив повернення ${claimed.name || "гравця"}.`;
         startPolling();
-      } else if (["rejected", "expired", "superseded"].includes(payload.status)) {
+      } else if (["rejected", "expired", "superseded", "consumed"].includes(payload.status)) {
         clearInterval(recoveryPollTimer);
         localStorage.removeItem("shelter100-recovery-request");
-        if (statusElement) statusElement.textContent = payload.status === "rejected" ? "Хост відхилив запит." : payload.status === "superseded" ? "Цей запит замінено новішим." : "Запит прострочено.";
+        if (statusElement) statusElement.textContent = payload.status === "rejected" ? "Хост відхилив запит." : payload.status === "superseded" ? "Цей запит замінено новішим." : payload.status === "consumed" ? "Новий сеанс уже було отримано." : "Запит прострочено.";
       } else if (statusElement) statusElement.textContent = `Очікується підтвердження хоста для ${payload.playerName || requestData.playerName || "гравця"}…`;
     } catch (error) {
+      clearInterval(recoveryPollTimer);
+      if (error.status === 404 || error.status === 410) localStorage.removeItem("shelter100-recovery-request");
       if (statusElement) statusElement.textContent = error.message;
     }
   };
   await check();
-  recoveryPollTimer = setInterval(check, 3000);
+  if (localStorage.getItem("shelter100-recovery-request")) recoveryPollTimer = setInterval(check, 3000);
 }
 $("rejoinSubmit").onclick = async () => {
   try {

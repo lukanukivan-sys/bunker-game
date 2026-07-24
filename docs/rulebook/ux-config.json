@@ -1,0 +1,135 @@
+{
+  "schema": "rulebook-ux-v1",
+  "defaultPageId": "front-cover",
+  "layouts": {
+    "desktop": {
+      "id": "two-page-spread",
+      "minWidth": 960,
+      "visiblePages": 2,
+      "turnStep": 2,
+      "showSpine": true,
+      "allowCornerDrag": false
+    },
+    "tablet": {
+      "id": "single-page-wide",
+      "minWidth": 640,
+      "maxWidth": 959,
+      "visiblePages": 1,
+      "turnStep": 1,
+      "showSpine": false,
+      "allowCornerDrag": false
+    },
+    "mobile": {
+      "id": "single-page",
+      "maxWidth": 639,
+      "visiblePages": 1,
+      "turnStep": 1,
+      "showSpine": false,
+      "allowCornerDrag": false
+    }
+  },
+  "navigation": {
+    "buttons": true,
+    "pageEdgeClick": true,
+    "swipe": true,
+    "keyboard": [
+      "ArrowLeft",
+      "ArrowRight",
+      "PageUp",
+      "PageDown",
+      "Home",
+      "End",
+      "Escape"
+    ],
+    "historyDepth": 30,
+    "rememberLastPage": true,
+    "storageKey": "skhovyshche.rulebook.last-page"
+  },
+  "gestures": {
+    "minimumSwipeDistancePx": 44,
+    "maximumSwipeDurationMs": 700,
+    "axisLockRatio": 1.35
+  },
+  "motion": {
+    "defaultMode": "full",
+    "durationMs": 680,
+    "reducedDurationMs": 180,
+    "respectReducedMotion": true,
+    "modes": [
+      "full",
+      "simple",
+      "none"
+    ],
+    "easing": "cubic-bezier(0.42, 0, 0.25, 1)"
+  },
+  "focus": {
+    "trapInsideBook": true,
+    "restoreOpener": true,
+    "initialTarget": "rulebook-close",
+    "announcePageChanges": true
+  },
+  "reading": {
+    "defaultTextScale": 1,
+    "textScaleOptions": [
+      0.9,
+      1,
+      1.125,
+      1.25,
+      1.5
+    ],
+    "scrollFallbackScale": 1.25,
+    "defaultAudience": "player",
+    "defaultMode": "all",
+    "storageKey": "skhovyshche.rulebook.reading.v1",
+    "lineHeightOptions": [
+      "compact",
+      "comfortable",
+      "relaxed"
+    ],
+    "contrastOptions": [
+      "normal",
+      "high"
+    ],
+    "showHintsByDefault": true,
+    "pageFitLevels": [
+      "normal",
+      "compact",
+      "dense",
+      "tight"
+    ],
+    "hideDesktopScrollbars": true
+  },
+  "panels": {
+    "contents": "drawer",
+    "search": "drawer",
+    "settings": "popover",
+    "bookmarks": "drawer"
+  },
+  "audio": {
+    "enabledByDefault": false,
+    "defaultVolume": 0.28,
+    "storageKey": "skhovyshche.rulebook.audio",
+    "cues": [
+      "open",
+      "close"
+    ],
+    "pageTurnSound": false
+  },
+  "search": {
+    "minimumQueryLength": 2,
+    "resultLimit": 24,
+    "debounceMs": 110,
+    "includeTerminologyAliases": true
+  },
+  "library": {
+    "bookmarkStorageKey": "skhovyshche.rulebook.bookmarks",
+    "historyStorageKey": "skhovyshche.rulebook.history",
+    "historyDepth": 30
+  },
+  "performance": {
+    "lazySearchIndex": true,
+    "renderCachePages": 44,
+    "lazyVisuals": true,
+    "resizeDebounceMs": 100
+  }
+}

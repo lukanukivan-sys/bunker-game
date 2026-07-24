@@ -1,0 +1,139 @@
+{
+  "schema": "rulebook-manifest-v1",
+  "rulebookVersion": "0.8.0-rc.1",
+  "productVersion": "1.2.11",
+  "locale": "uk-UA",
+  "title": "СХОВИЩЕ — інтерактивний довідник",
+  "subtitle": "Повні правила, контекстна допомога, інтерактивні приклади, пошук і посібник ведучого",
+  "defaultAudience": "player",
+  "statuses": [
+    "canonical",
+    "provisional",
+    "reference",
+    "technical"
+  ],
+  "audiences": {
+    "player": "Гравець",
+    "host": "Ведучий",
+    "all": "Усі учасники",
+    "technical": "Технічний супровід"
+  },
+  "modes": {
+    "all": "Усі режими",
+    "classic": "Класичний відбір",
+    "survival": "Спільне виживання",
+    "factions": "Фракції та зрадники",
+    "detective": "Детектив",
+    "advanced": "Розширена гра"
+  },
+  "parts": [
+    {
+      "id": "entry",
+      "title": "Вхід до системи",
+      "order": 1
+    },
+    {
+      "id": "player",
+      "title": "Посібник гравця",
+      "order": 2
+    },
+    {
+      "id": "mechanics",
+      "title": "Механіки",
+      "order": 3
+    },
+    {
+      "id": "modes",
+      "title": "Режими",
+      "order": 4
+    },
+    {
+      "id": "host",
+      "title": "Посібник ведучого",
+      "order": 5
+    },
+    {
+      "id": "reference",
+      "title": "Довідкові матеріали",
+      "order": 6
+    }
+  ],
+  "chapters": [
+    {
+      "id": "introduction",
+      "file": "content/00-introduction.md",
+      "part": "entry",
+      "order": 1,
+      "status": "canonical"
+    },
+    {
+      "id": "quick-start",
+      "file": "content/01-quick-start.md",
+      "part": "entry",
+      "order": 2,
+      "status": "canonical"
+    },
+    {
+      "id": "player-guide",
+      "file": "content/02-player-guide.md",
+      "part": "player",
+      "order": 3,
+      "status": "provisional"
+    },
+    {
+      "id": "mechanics",
+      "file": "content/03-mechanics.md",
+      "part": "mechanics",
+      "order": 4,
+      "status": "provisional"
+    },
+    {
+      "id": "modes",
+      "file": "content/04-modes.md",
+      "part": "modes",
+      "order": 5,
+      "status": "provisional"
+    },
+    {
+      "id": "results",
+      "file": "content/05-results.md",
+      "part": "modes",
+      "order": 6,
+      "status": "provisional"
+    },
+    {
+      "id": "host-guide",
+      "file": "content/06-host-guide.md",
+      "part": "host",
+      "order": 7,
+      "status": "canonical"
+    },
+    {
+      "id": "reference",
+      "file": "content/07-reference.md",
+      "part": "reference",
+      "order": 8,
+      "status": "reference"
+    },
+    {
+      "id": "edition",
+      "file": "content/08-edition.md",
+      "part": "reference",
+      "order": 9,
+      "status": "technical"
+    }
+  ],
+  "dataFiles": {
+    "bookMap": "book-map.json",
+    "sourceInventory": "source-inventory.json",
+    "unstableRules": "unstable-rules.json",
+    "terminology": "terminology.json",
+    "editorialPolicy": "editorial-policy.json",
+    "uxConfig": "ux-config.json",
+    "designTokens": "design-tokens.json",
+    "versionHistory": "version-history.json",
+    "ruleChanges": "rule-changes.json",
+    "usabilityScenarios": "usability-scenarios.json",
+    "humanAcceptance": "human-acceptance.json"
+  }
+}

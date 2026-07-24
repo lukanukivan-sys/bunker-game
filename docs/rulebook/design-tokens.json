@@ -1,0 +1,117 @@
+{
+  "schema": "rulebook-design-tokens-v1",
+  "color": {
+    "void": "#050809",
+    "background": "#090f12",
+    "backdrop": "rgba(2, 5, 7, 0.88)",
+    "surface": "#10181c",
+    "surfaceRaised": "#172126",
+    "steel": "#253238",
+    "paper": "#d8d0bd",
+    "paperDeep": "#c7bda7",
+    "paperInk": "#202522",
+    "paperMuted": "#5d625d",
+    "textMain": "#edf1ee",
+    "textSecondary": "#a7b1ae",
+    "textMuted": "#717d7a",
+    "amber": "#e7aa32",
+    "amberBright": "#ffc34c",
+    "amberGlow": "rgba(231, 170, 50, 0.24)",
+    "danger": "#c95245",
+    "dangerGlow": "rgba(201, 82, 69, 0.18)",
+    "success": "#65a77f",
+    "information": "#6f9eac",
+    "focus": "#ffd77e"
+  },
+  "typography": {
+    "display": "'Arial Narrow', 'Roboto Condensed', 'Segoe UI', sans-serif",
+    "body": "Inter, 'Segoe UI', Arial, sans-serif",
+    "document": "Georgia, 'Times New Roman', serif",
+    "mono": "'Cascadia Mono', Consolas, monospace",
+    "sizes": {
+      "screenTitle": "clamp(2rem, 4vw, 2.75rem)",
+      "callout": "clamp(1.55rem, 3vw, 2rem)",
+      "section": "clamp(1.15rem, 2vw, 1.375rem)",
+      "item": "1.0625rem",
+      "body": "1rem",
+      "help": "0.875rem",
+      "service": "0.75rem"
+    },
+    "lineHeights": {
+      "tight": 1.12,
+      "heading": 1.25,
+      "body": 1.58,
+      "help": 1.45
+    }
+  },
+  "spacing": {
+    "1": "0.25rem",
+    "2": "0.5rem",
+    "3": "0.75rem",
+    "4": "1rem",
+    "5": "1.5rem",
+    "6": "2rem",
+    "7": "3rem",
+    "8": "4rem"
+  },
+  "radius": {
+    "control": "0.55rem",
+    "panel": "0.85rem",
+    "book": "1rem",
+    "pill": "999px"
+  },
+  "shadow": {
+    "book": "0 2rem 5rem rgba(0, 0, 0, 0.56)",
+    "page": "0 1rem 2rem rgba(0, 0, 0, 0.22)",
+    "inset": "inset 0 0 2.5rem rgba(48, 38, 25, 0.16)",
+    "focus": "0 0 0 3px rgba(255, 215, 126, 0.42)"
+  },
+  "motion": {
+    "fast": "120ms",
+    "normal": "220ms",
+    "pageTurn": "680ms",
+    "easing": "cubic-bezier(0.42, 0, 0.25, 1)"
+  },
+  "layout": {
+    "bookMaxWidth": "92rem",
+    "bookMaxHeight": "62rem",
+    "pageAspectRatio": "0.72",
+    "pagePadding": "clamp(1rem, 1.8vw, 2rem)",
+    "spineWidth": "1.25rem",
+    "toolbarHeight": "3.35rem"
+  },
+  "zIndex": {
+    "backdrop": 900,
+    "book": 910,
+    "page": 920,
+    "turningPage": 930,
+    "drawer": 940,
+    "tooltip": 950
+  },
+  "templates": [
+    "cover",
+    "back-cover",
+    "title",
+    "contents",
+    "chapter-opener",
+    "standard",
+    "checklist",
+    "flow",
+    "dossier",
+    "warning",
+    "decision",
+    "comparison",
+    "dashboard",
+    "procedure",
+    "mode-opener",
+    "matrix",
+    "report",
+    "troubleshooting",
+    "glossary",
+    "faq",
+    "table",
+    "changelog",
+    "settings",
+    "edition"
+  ]
+}

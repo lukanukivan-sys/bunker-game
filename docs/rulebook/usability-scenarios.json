@@ -1,0 +1,88 @@
+{
+  "schema": "rulebook-usability-scenarios-v1",
+  "targetAnswerSeconds": 20,
+  "minimumParticipants": 3,
+  "minimumCompletedScenariosPerParticipant": 8,
+  "scenarios": [
+    {
+      "id": "RB-UX-001",
+      "audience": "player",
+      "start": "home",
+      "task": "Відкрити довідник до створення кімнати й знайти правила швидкого старту.",
+      "expectedPageId": "quick-overview",
+      "success": "Правильну сторінку знайдено не довше ніж за 20 секунд."
+    },
+    {
+      "id": "RB-UX-002",
+      "audience": "player",
+      "start": "rulebook",
+      "task": "Знайти відповідь, що робити під час нічиєї у голосуванні.",
+      "expectedPageId": "voting",
+      "success": "Користувач знаходить provisional-позначку й не вигадує правило поза інтерфейсом."
+    },
+    {
+      "id": "RB-UX-003",
+      "audience": "player",
+      "start": "lobby",
+      "task": "Знайти, як повторно увійти після закриття браузера.",
+      "expectedPageId": "session-recovery",
+      "success": "Користувач не пропонує надсилати секрет або токен у URL."
+    },
+    {
+      "id": "RB-UX-004",
+      "audience": "host",
+      "start": "host-panel",
+      "task": "Знайти причину, чому фаза не переходить.",
+      "expectedPageId": "host-troubleshooting",
+      "success": "Користувач перевіряє список обов’язкових дій і статуси учасників."
+    },
+    {
+      "id": "RB-UX-005",
+      "audience": "player",
+      "start": "dossier",
+      "task": "З’ясувати різницю між прихованою та відкритою характеристикою.",
+      "expectedPageId": "hidden-open",
+      "success": "Відповідь знайдено через контекстну кнопку або зміст."
+    },
+    {
+      "id": "RB-UX-006",
+      "audience": "host",
+      "start": "rulebook",
+      "task": "Знайти, коли seed доступний ведучому й коли відкривається знову.",
+      "expectedPageId": "faq-first-game",
+      "success": "Користувач правильно описує видимість seed у лобі, під час гри та після фіналу."
+    },
+    {
+      "id": "RB-UX-007",
+      "audience": "player",
+      "start": "rulebook",
+      "task": "Знайти правила медичної допомоги для розширеного режиму.",
+      "expectedPageId": "medicine",
+      "success": "Користувач помічає, що крайові випадки ще мають статус provisional."
+    },
+    {
+      "id": "RB-UX-008",
+      "audience": "player",
+      "start": "rulebook",
+      "task": "Перемкнути довідник у режим без анімації та збільшити текст.",
+      "expectedPageId": "accessibility",
+      "success": "Налаштування застосовані без втрати поточної сторінки."
+    },
+    {
+      "id": "RB-UX-009",
+      "audience": "host",
+      "start": "rulebook",
+      "task": "Знайти журнал змін правил і визначити, що змінилось у recovery.",
+      "expectedPageId": "rule-changes",
+      "success": "Користувач відкриває відповідний запис і переходить до сторінки recovery."
+    },
+    {
+      "id": "RB-UX-010",
+      "audience": "player",
+      "start": "mobile",
+      "task": "На телефоні знайти опис поточної фази й повернутися в гру.",
+      "expectedPageId": "round-cycle",
+      "success": "Книга відкривається однією сторінкою, закривається через Esc/кнопку й повертає focus."
+    }
+  ]
+}

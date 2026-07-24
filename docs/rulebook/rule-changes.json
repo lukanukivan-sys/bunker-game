@@ -1,0 +1,61 @@
+{
+  "schema": "rulebook-changelog-v1",
+  "productVersion": "1.2.11",
+  "rulebookVersion": "0.8.0-rc.1",
+  "entries": [
+    {
+      "id": "release-candidate-workflow",
+      "date": "2026-07-24",
+      "type": "interface",
+      "title": "Довідник підготовлено як контрольований release candidate",
+      "summary": "Додано локальний тестовий звіт, приймальні сценарії, фінальний release gate і CI-перевірку синхронізації механік із правилами.",
+      "pages": [
+        "rule-changes",
+        "edition-version",
+        "accessibility"
+      ]
+    },
+    {
+      "id": "silent-page-turn",
+      "date": "2026-07-24",
+      "type": "interface",
+      "title": "Перегортання сторінок стало беззвучним",
+      "summary": "Звуки перегортання повністю вилучено. За бажанням окремо вмикаються лише тихі звуки відкриття та закриття книги.",
+      "pages": [
+        "accessibility"
+      ]
+    },
+    {
+      "id": "stable-page-turn",
+      "date": "2026-07-24",
+      "type": "interface",
+      "title": "Стабільне форматування під час перегортання",
+      "summary": "Розмір тексту, щільність верстки, діаграми та службові позначки більше не змінюються в середині анімації.",
+      "pages": [
+        "quick-overview",
+        "round-cycle"
+      ]
+    },
+    {
+      "id": "session-recovery-security",
+      "date": "2026-07-24",
+      "type": "rule",
+      "title": "Уточнено безпечне відновлення сеансу",
+      "summary": "Ведучий підтверджує запит, а новий сеанс видається лише один раз без секретів у URL.",
+      "pages": [
+        "session-recovery"
+      ]
+    },
+    {
+      "id": "seed-visibility",
+      "date": "2026-07-24",
+      "type": "rule",
+      "title": "Уточнено видимість seed",
+      "summary": "Під час активної партії seed прихований, а після фіналу може використовуватися для перевірки відтворюваності.",
+      "pages": [
+        "faq-first-game",
+        "edition-version"
+      ]
+    }
+  ]
+}

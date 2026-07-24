@@ -26,6 +26,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
@@ -56,6 +58,13 @@ jobs:
             exit 1
           fi
 
+      - name: Check rules and documentation synchronization
+        env:
+          RULEBOOK_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          RULEBOOK_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          RULEBOOK_SYNC_STRICT: "1"
+        run: npm run audit:rulebook:sync
+
       - name: Check syntax
         run: npm run check:syntax
 
@@ -64,6 +73,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Build image
         run: docker build -t skhovyshche:${{ github.sha }} .

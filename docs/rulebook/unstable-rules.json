@@ -1,0 +1,90 @@
+{
+  "schema": "rulebook-unstable-rules-v1",
+  "policy": "Запис залишається provisional, доки серверна реалізація, інтерфейс, тест і текст правила не пройдуть одну звірку.",
+  "items": [
+    {
+      "id": "RB-PROV-001",
+      "chapterId": "modes",
+      "anchors": [
+        "classic-mode"
+      ],
+      "topic": "Місткість сховища і момент завершення відбору",
+      "workstream": "P0 mechanics — capacity",
+      "status": "open"
+    },
+    {
+      "id": "RB-PROV-002",
+      "chapterId": "mechanics",
+      "anchors": [
+        "resources"
+      ],
+      "topic": "Критичні нульові ресурси та блокувальні умови",
+      "workstream": "P0 mechanics — critical resources",
+      "status": "open"
+    },
+    {
+      "id": "RB-PROV-003",
+      "chapterId": "mechanics",
+      "anchors": [
+        "medicine"
+      ],
+      "topic": "Медична оцінка, лікування і наслідки невиконаної допомоги",
+      "workstream": "P0 mechanics — medicine",
+      "status": "open"
+    },
+    {
+      "id": "RB-PROV-004",
+      "chapterId": "results",
+      "anchors": [
+        "victory-layers",
+        "final-report",
+        "final-trigger"
+      ],
+      "topic": "Фінальна формула та недопущення подвійного врахування",
+      "workstream": "P0 mechanics — final scoring",
+      "status": "open"
+    },
+    {
+      "id": "RB-PROV-005",
+      "chapterId": "player-guide",
+      "anchors": [
+        "crisis",
+        "voting",
+        "sanctions"
+      ],
+      "topic": "Право вибору в кризі, голосування, нічия та санкції",
+      "workstream": "P0 modes — crisis and voting",
+      "status": "open"
+    },
+    {
+      "id": "RB-PROV-006",
+      "chapterId": "modes",
+      "anchors": [
+        "detective-mode"
+      ],
+      "topic": "Доказовий поріг і детективний вердикт",
+      "workstream": "P0 modes — detective verdict",
+      "status": "open"
+    },
+    {
+      "id": "RB-PROV-007",
+      "chapterId": "mechanics",
+      "anchors": [
+        "outside-camp"
+      ],
+      "topic": "Зовнішній табір, апеляція та угоди після вигнання",
+      "workstream": "P0 modes — outside agreements",
+      "status": "open"
+    },
+    {
+      "id": "RB-PROV-008",
+      "chapterId": "modes",
+      "anchors": [
+        "advanced-mode"
+      ],
+      "topic": "Сумісність модулів і остаточний цикл розширеної гри",
+      "workstream": "P0 modes — module compatibility",
+      "status": "open"
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "schema": "rulebook-source-inventory-v1",
+  "principle": "Правило вважається канонічним лише тоді, коли текст спирається на чинний код, інтерфейс і регресійний тест. Старі звіти використовуються як історичний контекст, а не як остаточна істина.",
+  "sources": [
+    {
+      "id": "product-version",
+      "type": "code",
+      "path": "config/version.js",
+      "priority": 1,
+      "scope": [
+        "versioning"
+      ]
+    },
+    {
+      "id": "server-contract",
+      "type": "code",
+      "path": "server.js",
+      "priority": 1,
+      "scope": [
+        "phases",
+        "actions",
+        "victory",
+        "recovery",
+        "privacy"
+      ]
+    },
+    {
+      "id": "client-language",
+      "type": "code",
+      "path": "public/app.js",
+      "priority": 1,
+      "scope": [
+        "labels",
+        "instructions",
+        "modes",
+        "host-flow"
+      ]
+    },
+    {
+      "id": "client-layout",
+      "type": "code",
+      "path": "public/index.html",
+      "priority": 1,
+      "scope": [
+        "screen-names",
+        "controls"
+      ]
+    },
+    {
+      "id": "current-readme",
+      "type": "documentation",
+      "path": "README.md",
+      "priority": 2,
+      "scope": [
+        "overview",
+        "modes",
+        "operations"
+      ]
+    },
+    {
+      "id": "upgrade-reports",
+      "type": "documentation-family",
+      "path": "UPGRADE_*.txt",
+      "priority": 3,
+      "scope": [
+        "historical-decisions"
+      ]
+    },
+    {
+      "id": "test-contracts",
+      "type": "test-family",
+      "path": "test_*.js",
+      "priority": 1,
+      "scope": [
+        "behavioral-contracts"
+      ]
+    },
+    {
+      "id": "boardgame-reference",
+      "type": "external-reference",
+      "path": null,
+      "priority": 4,
+      "scope": [
+        "genre",
+        "baseline-tabletop-terminology"
+      ],
+      "notes": "Наданий власником проєкту довідковий матеріал. Текст не імпортується дослівно; ліцензійна перевірка потрібна перед публікацією будь-яких запозичених фрагментів."
+    },
+    {
+      "id": "project-audit",
+      "type": "project-review",
+      "path": null,
+      "priority": 2,
+      "scope": [
+        "rule-issues",
+        "player-guide",
+        "host-guide"
+      ],
+      "notes": "Наскрізний аудит розділів 1–180 і реєстру RULE-ISSUE. Точне перенесення до репозиторію виконується окремим редакційним імпортом."
+    }
+  ]
+}

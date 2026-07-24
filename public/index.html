@@ -7,6 +7,7 @@
 <meta content="#121619" name="theme-color"/>
 <title>Сховище 1.2.10 — мережева гра</title>
 <link href="styles.css?stage7-v=ui6-stage6-council" rel="stylesheet"/>
+<link href="rulebook/rulebook.css?stage=36-40" rel="stylesheet"/>
 </head>
 <body class="cinematic-v2 ui5-command">
 <div class="noise"></div>
@@ -27,6 +28,10 @@
 <p class="eyebrow">Приватна гра для друзів</p>
 <h2>Сформуйте групу, яка переживе катастрофу</h2>
 <p class="lead">Створіть приватну партію, надішліть друзям код і починайте відбір. Кожен учасник бачить власне досьє лише на своєму пристрої.</p>
+<div class="hero-rulebook-entry">
+<button class="button ghost rulebook-launch-button" data-rulebook-open="front-cover" id="homeRulebookButton" type="button">Відкрити довідник</button>
+<p class="muted">Правила, швидкий старт і посібник ведучого доступні ще до створення кімнати.</p>
+</div>
 </div>
 <div class="hero-symbol">⌁</div>
 </section>
@@ -93,6 +98,7 @@
 <label><span>Рішення громади</span><select id="voteSystem"><option value="exile">Лише вигнання</option><option value="tribunal">Трибунал: 3 види санкцій</option></select></label>
 <label><span>Видимість голосів</span><select id="voteVisibility"><option value="secret">Таємні</option><option value="open">Відкриті</option></select></label>
 <label><span>Нічия</span><select id="tieRule"><option selected="" value="runoff">Переголосування між лідерами</option><option value="no_action">Одразу без санкцій</option></select></label>
+<button class="context-rulebook-link" data-rulebook-open="voting" type="button">? Правила голосування</button>
 </div>
 <section class="automation-settings-card">
 <div><span>Ведення партії</span><small>Захист від простою та відсутніх гравців</small></div>
@@ -128,6 +134,7 @@
 <button class="button ghost full hidden" id="resumeButton" type="button">Відновити останній сеанс</button>
 <details class="recovery-entry-details" id="recoveryEntryDetails">
 <summary>Повернути свого персонажа за персональним кодом</summary>
+<button class="context-rulebook-link" data-rulebook-open="session-recovery" type="button">? Як працює відновлення</button>
 <div class="nested-form" id="rejoinForm">
 <label><span>Код кімнати <small>(6 символів)</small></span><input autocapitalize="characters" autocomplete="off" class="code-input" id="rejoinRoomCode" maxlength="6" minlength="6" placeholder="ABC123" spellcheck="false"/></label>
 <label><span>Персональний код <small>(10 символів)</small></span><input autocapitalize="characters" autocomplete="off" class="code-input recovery-code-input" id="rejoinRecoveryCode" maxlength="10" minlength="10" placeholder="ABCD23EFGH" spellcheck="false"/></label>
@@ -158,7 +165,7 @@
 <p class="muted">Натисніть код, щоб скопіювати.</p>
 </div>
 <div class="room-settings" id="roomSettings"></div>
-<button class="button ghost lobby-parameters-button" id="openLobbyDrawer" type="button">Параметри</button></section><div class="lobby-command-layout"><section class="lobby-command-main"><section class="panel lobby-briefing-card"><div class="lobby-briefing-copy"><p class="eyebrow">Передстартовий відсік</p><h2>Група готується до закриття гермодверей</h2><p class="muted">Перевірте склад групи, підтвердьте готовність і починайте партію. Технічні параметри сховані в окремій панелі.</p></div><div class="lobby-briefing-status"><span class="lobby-status-label">Поточний стан</span><strong id="lobbyBriefingStatus">Очікування учасників</strong></div></section><section class="panel">
+<button class="button ghost lobby-parameters-button" id="openLobbyDrawer" type="button">Параметри</button></section><div class="lobby-command-layout"><section class="lobby-command-main"><section class="panel lobby-briefing-card"><div class="lobby-briefing-copy"><p class="eyebrow">Передстартовий відсік</p><h2>Група готується до закриття гермодверей</h2><p class="muted">Перевірте склад групи, підтвердьте готовність і починайте партію. Технічні параметри сховані в окремій панелі.</p><button class="context-rulebook-link" data-rulebook-open="lobby-ready" type="button">? Швидкий старт</button></div><div class="lobby-briefing-status"><span class="lobby-status-label">Поточний стан</span><strong id="lobbyBriefingStatus">Очікування учасників</strong></div></section><section class="panel">
 <div class="section-title"><div><p class="eyebrow">Лобі</p><h3>Гравці</h3></div><span class="badge" id="playerCount">0/12</span></div>
 <div class="lobby-list" id="lobbyPlayers"></div>
 </section><section class="panel lobby-controls">
@@ -396,6 +403,7 @@
   <summary><span><b>Умови результату</b><small>Груповий, особистий і спеціальний рівні</small></span><span class="status-indicator" id="victoryModeBadge"></span></summary>
   <div class="victory-rule-grid" id="victoryRulesCards"></div>
   <p class="victory-end-condition muted" id="victoryEndCondition"></p>
+<button class="context-rulebook-link" data-rulebook-open="victory-layers" type="button">? Як визначається результат</button>
 </details>
 <section class="panel current-action-panel compact-panel" data-game-tab-panel="turn" id="currentActionPanel" role="tabpanel">
 <div class="current-action-heading">
@@ -404,7 +412,7 @@
 </div>
 <p class="current-action-text muted" id="currentActionText"></p>
 <div class="current-action-steps" id="currentActionSteps"></div>
-<button class="button primary current-action-shortcut" id="currentActionShortcut" type="button">Перейти до дії</button>
+<div class="current-action-buttons"><button class="button primary current-action-shortcut" id="currentActionShortcut" type="button">Перейти до дії</button><button class="context-rulebook-link" data-rulebook-open="round-cycle" id="currentActionRulebookButton" type="button">? Правило фази</button></div>
 </section>
 <div class="game-grid game-tabbed-content">
 <div class="game-main-column">
@@ -429,6 +437,7 @@
 <span class="muted" id="revealCounter"></span>
 <button class="button secondary" id="revealSelectedButton" type="button">Відкрити вибрані</button>
 </div>
+<button class="context-rulebook-link" data-rulebook-open="dossier" type="button">? Про особову справу</button>
 <div class="character-grid" id="privateCharacter"></div>
 <div class="private-secondary-grid">
 <article class="secret-box role-box compact-box" id="roleBox">
@@ -629,6 +638,50 @@
 </div>
 </section>
 </main>
+
+<div aria-hidden="true" class="rulebook-backdrop hidden" id="rulebookBackdrop">
+<section aria-hidden="true" aria-labelledby="rulebookCurrentTitle" aria-modal="true" class="rulebook-dialog" id="rulebookDialog" role="dialog" tabindex="-1">
+<header class="rulebook-toolbar">
+<button class="rulebook-skip-link" id="rulebookSkipToPage" type="button">До поточної сторінки</button>
+<div class="rulebook-toolbar-copy"><p>Інтерактивний довідник</p><h2 id="rulebookCurrentTitle">СХОВИЩЕ</h2></div>
+<nav aria-label="Інструменти довідника" class="rulebook-toolbar-actions">
+<button aria-controls="rulebookDrawer" aria-expanded="false" class="rulebook-tool-button" id="rulebookContentsButton" type="button"><span aria-hidden="true" data-rulebook-icon>☰</span><span>Зміст</span></button>
+<button aria-controls="rulebookDrawer" aria-expanded="false" class="rulebook-tool-button" id="rulebookFilterButton" type="button"><span aria-hidden="true" data-rulebook-icon>◫</span><span>Фільтри</span></button>
+<button aria-controls="rulebookDrawer" aria-expanded="false" class="rulebook-tool-button" id="rulebookSearchButton" type="button"><span aria-hidden="true" data-rulebook-icon>⌕</span><span>Пошук</span></button>
+<button aria-label="Додати сторінку в закладки" aria-pressed="false" class="rulebook-tool-button rulebook-bookmark-button" id="rulebookBookmarkButton" title="Додати в закладки" type="button"><span aria-hidden="true" data-rulebook-icon>☆</span><span>Закладка</span></button>
+<button aria-controls="rulebookDrawer" aria-expanded="false" class="rulebook-tool-button" id="rulebookLibraryButton" type="button"><span aria-hidden="true" data-rulebook-icon>▤</span><span>Збережене</span></button>
+<button aria-controls="rulebookDrawer" aria-expanded="false" class="rulebook-tool-button" id="rulebookSettingsButton" type="button"><span aria-hidden="true" data-rulebook-icon>⚙</span><span>Читання</span></button>
+<button aria-controls="rulebookDrawer" aria-expanded="false" aria-label="Налаштувати звуки відкриття книги" aria-pressed="true" class="rulebook-tool-button" id="rulebookSoundButton" type="button"><span aria-hidden="true" data-rulebook-icon>🔊</span><span>Звук</span></button>
+</nav>
+<button aria-label="Закрити довідник" class="rulebook-close-button" id="rulebookClose" type="button">×</button>
+</header>
+<div aria-hidden="true" class="rulebook-drawer-scrim hidden" id="rulebookDrawerScrim"></div>
+<aside aria-hidden="true" aria-labelledby="rulebookDrawerTitle" class="rulebook-drawer" id="rulebookDrawer">
+<header class="rulebook-drawer-header"><div><p>Навігаційний модуль</p><h3 id="rulebookDrawerTitle">Зміст</h3></div><button aria-label="Закрити бічну панель" class="rulebook-drawer-close" id="rulebookDrawerClose" type="button">×</button></header>
+<div class="rulebook-drawer-content" id="rulebookDrawerContent"></div>
+</aside>
+<div class="rulebook-book-stage" id="rulebookBookStage">
+<button aria-label="Попередня сторінка" class="rulebook-edge rulebook-edge-previous" id="rulebookPreviousEdge" type="button">‹</button>
+<div class="rulebook-viewport" id="rulebookViewport">
+<div class="rulebook-pages">
+<article class="rulebook-page rulebook-page-left" id="rulebookLeftPage"></article>
+<div class="rulebook-spine" id="rulebookSpine" aria-hidden="true"></div>
+<article class="rulebook-page rulebook-page-right" id="rulebookRightPage"></article>
+</div>
+<div class="rulebook-turn-layer" id="rulebookTurnLayer" aria-hidden="true"></div>
+<div class="rulebook-loading hidden" id="rulebookLoading">Завантаження протоколу…</div>
+</div>
+<button aria-label="Наступна сторінка" class="rulebook-edge rulebook-edge-next" id="rulebookNextEdge" type="button">›</button>
+</div>
+<footer class="rulebook-footerbar" data-rulebook-chrome="footer">
+<button class="rulebook-nav-button" id="rulebookPrevious" type="button">← Назад</button>
+<span class="rulebook-navigation-hint">Клавіші ← → · свайп · Page Up / Page Down</span>
+<span class="rulebook-page-counter" id="rulebookPageCounter">—</span>
+<button class="rulebook-nav-button" id="rulebookNext" type="button">Далі →</button>
+</footer>
+<div aria-atomic="true" aria-live="polite" class="rulebook-live-region" id="rulebookLiveRegion"></div>
+</section>
+</div>
 <div class="round-event-backdrop hidden" id="roundEventBackdrop"></div>
 <section aria-labelledby="roundEventModalTitle" aria-modal="true" class="round-event-modal hidden" id="roundEventModal" role="dialog">
 <div class="round-event-head">
@@ -651,6 +704,18 @@
 <p class="info-drawer-description" id="infoDrawerDescription">Натисніть «Опис» біля характеристики, щоб прочитати пояснення тут.</p>
 </aside>
 <div class="toast hidden" id="toast"></div>
+<script src="rulebook/rulebook-config.js?stage=36-40"></script>
+<script src="rulebook/data/rulebook-fallback.js?stage=36-40"></script>
+<script src="rulebook/rulebook-loader.js?stage=36-40"></script>
+<script src="rulebook/rulebook-model.js?stage=36-40"></script>
+<script src="rulebook/page-layout.js?stage=36-40"></script>
+<script src="rulebook/rulebook-renderer.js?stage=36-40"></script>
+<script src="rulebook/rulebook-search.js?stage=36-40"></script>
+<script src="rulebook/rulebook-library.js?stage=36-40"></script>
+<script src="rulebook/rulebook-audio.js?stage=36-40"></script>
+<script src="rulebook/rulebook-feedback.js?stage=36-40"></script>
+<script src="rulebook/page-turn.js?stage=36-40"></script>
+<script src="rulebook/rulebook-shell.js?stage=36-40"></script>
 <script src="app.js?stage7-v=ui6-stage6-council"></script>
 </body>
 </html>

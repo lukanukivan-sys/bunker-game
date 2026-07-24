@@ -1,0 +1,20 @@
+{
+  "schema": "rulebook-release-candidate-v1",
+  "generatedAt": "2026-07-24",
+  "productVersion": "1.2.11",
+  "rulebookVersion": "0.8.0-rc.1",
+  "contentDigest": "46ea30bdf7cafaec43858038f2d5661154235f71340c93d3f2bb10d4e3610247",
+  "pages": 44,
+  "scenarios": 10,
+  "openBlockers": 8,
+  "acceptanceStatus": "pending",
+  "acceptanceSessions": 0,
+  "blockingFindings": 0,
+  "mode": "rc",
+  "status": "ready",
+  "warnings": [
+    "Фінальне канонічне затвердження заблоковано: відкрито 8 механічних тем.",
+    "RC містить 8 provisional P0-тем; фінальний випуск заблокований.",
+    "Реальне приймальне тестування ще не завершено."
+  ]
+}
