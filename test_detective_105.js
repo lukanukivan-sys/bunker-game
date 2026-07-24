@@ -5,6 +5,7 @@ const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
 const { stopChildProcess } = require("./test_support");
+const { PRODUCT_VERSION } = require("./config/version");
 
 const baseDir = __dirname;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "shelter-detective-105-"));
@@ -23,10 +24,10 @@ async function api(route, options = {}) {
 }
 async function waitReady() {
   for (let index = 0; index < 60; index += 1) {
-    try { if ((await api("/api/health")).version === "1.2.10") return; } catch {}
+    try { if ((await api("/api/health")).version === PRODUCT_VERSION) return; } catch {}
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw new Error("Сервер 1.2.10 не запустився.");
+  throw new Error(`Сервер ${PRODUCT_VERSION} не запустився.`);
 }
 async function stop() {
   await stopChildProcess(server);
@@ -88,7 +89,7 @@ async function stop() {
   }
   assert.equal((await state()).game.log.length, accusationLog, "Таємні фінальні звинувачення не повинні потрапляти до журналу.");
   await stop(); fs.rmSync(dataDir, { recursive: true, force: true });
-  console.log("1.2.10: конкретна справа, нейтральні досьє, приватні перевірки, приховані здібності та відсутність витоку в журнал перевірені.");
+  console.log(`${PRODUCT_VERSION}: конкретна справа, нейтральні досьє, приватні перевірки, приховані здібності та відсутність витоку в журнал перевірені.`);
 })().catch(async (error) => {
   console.error(error); await stop(); fs.rmSync(dataDir, { recursive: true, force: true }); process.exit(1);
 });
