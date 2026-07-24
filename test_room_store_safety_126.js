@@ -7,6 +7,7 @@ const path = require("path");
 const { createRoomStore } = require("./lib/room_store");
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "skhovyshche-room-store-"));
+const tempRoots = [root];
 const schema = "rooms-v6";
 const roomsDir = path.join(root, schema);
 fs.mkdirSync(roomsDir, { recursive: true });
@@ -47,7 +48,7 @@ const store = createRoomStore({
   }
 });
 
-try {
+async function testReadSafety() {
   const rooms = store.read();
   assert.deepStrictEqual(rooms.map((room) => room.code).sort(), ["ABC123", "GHI789"]);
 
@@ -64,8 +65,98 @@ try {
 
   const backupPayload = JSON.parse(fs.readFileSync(report.preMigrationBackups[0], "utf8"));
   assert.strictEqual(backupPayload.code, "GHI789");
-
-  console.log("✅ Room store: schema mismatch ізольовано, legacy-джерело збережено до міграції.");
-} finally {
-  fs.rmSync(root, { recursive: true, force: true });
 }
+
+async function testWriteFailureRecoveryAndBackupPropagation() {
+  const dataDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "skhovyshche-room-store-write-")
+  );
+  tempRoots.push(dataDir);
+  const currentRooms = [{
+    code: "SAVE01",
+    players: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  }];
+  const events = [];
+  const writeStore = createRoomStore({
+    dataDir,
+    schema,
+    productVersion: "1.2.11",
+    ttlMs: 30 * 24 * 60 * 60 * 1000,
+    getRooms: () => currentRooms,
+    reporter: {
+      saveSucceeded: () => events.push("save-ok"),
+      saveFailed: () => events.push("save-failed"),
+      backupSucceeded: ({ status }) =>
+        events.push(`backup-${status}`),
+      backupFailed: () => events.push("backup-failed")
+    },
+    logger: {
+      warn() {},
+      error() {}
+    }
+  });
+
+  await writeStore.saveNow();
+  assert.equal(events.at(-1), "save-ok");
+
+  const writeRoomsDir = path.join(dataDir, schema);
+  fs.rmSync(writeRoomsDir, { recursive: true, force: true });
+  fs.writeFileSync(writeRoomsDir, "blocks directory creation", "utf8");
+  await assert.rejects(writeStore.saveNow());
+  assert.equal(events.at(-1), "save-failed");
+
+  fs.unlinkSync(writeRoomsDir);
+  await writeStore.saveNow();
+  assert.equal(events.at(-1), "save-ok");
+
+  const backupDir = path.join(dataDir, "backups");
+  fs.writeFileSync(backupDir, "blocks backup directory", "utf8");
+  await assert.rejects(writeStore.backup("startup"));
+  assert.equal(events.at(-1), "backup-failed");
+
+  fs.unlinkSync(backupDir);
+  assert.equal(await writeStore.backup("startup"), "completed");
+  assert.equal(events.at(-1), "backup-completed");
+}
+
+async function testEmptyStartupBackupIsExplicit() {
+  const dataDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "skhovyshche-room-store-empty-")
+  );
+  tempRoots.push(dataDir);
+  const statuses = [];
+  const emptyStore = createRoomStore({
+    dataDir,
+    schema,
+    productVersion: "1.2.11",
+    ttlMs: 30 * 24 * 60 * 60 * 1000,
+    getRooms: () => [],
+    reporter: {
+      backupSucceeded: ({ status }) => statuses.push(status)
+    }
+  });
+  assert.equal(await emptyStore.backup("startup"), "skipped-empty");
+  assert.deepStrictEqual(statuses, ["skipped-empty"]);
+}
+
+async function main() {
+  try {
+    await testReadSafety();
+    await testWriteFailureRecoveryAndBackupPropagation();
+    await testEmptyStartupBackupIsExplicit();
+    console.log(
+      "✅ Room store: read safety, write recovery and backup status verified."
+    );
+  } finally {
+    for (const dir of tempRoots) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

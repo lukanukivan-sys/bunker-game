@@ -25,7 +25,7 @@ async function api(route, options = {}) {
 }
 async function waitReady() {
   for (let i = 0; i < 50; i += 1) {
-    try { const health = await api("/api/health"); if (health.version === PRODUCT_VERSION) return; } catch {}
+    try { const readiness = await api("/api/ready"); if (readiness.ready) return; } catch {}
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error("Сервер не запустився.");

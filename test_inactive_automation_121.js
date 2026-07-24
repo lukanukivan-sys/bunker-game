@@ -21,7 +21,7 @@ async function api(route, method = "GET", body = null, expectError = false) {
 }
 async function ready() {
   for (let i = 0; i < 80; i += 1) {
-    try { if ((await api("/api/health")).ok) return; } catch {}
+    try { if ((await api("/api/ready")).ready) return; } catch {}
     await sleep(100);
   }
   throw new Error("server timeout");

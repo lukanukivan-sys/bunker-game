@@ -5,4 +5,7 @@ services:
     plan: free
     buildCommand: npm install --omit=dev
     startCommand: npm start
-    healthCheckPath: /api/health
+    healthCheckPath: /api/ready
+    envVars:
+      - key: PERSISTENCE_MODE
+        value: ephemeral-allowed

@@ -63,7 +63,7 @@ async function api(route, options = {}) {
 }
 async function waitReady() {
   for (let i = 0; i < 60; i += 1) {
-    try { if ((await api("/api/health")).ok) return; } catch {}
+    try { if ((await api("/api/ready")).ready) return; } catch {}
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error("Сервер не запустився");

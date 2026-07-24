@@ -90,9 +90,9 @@ async function waitReady() {
     }
 
     try {
-      const health = await api("/api/health");
+      const health = await api("/api/ready");
 
-      if (health.ok) {
+      if (health.ready) {
         return;
       }
     } catch {

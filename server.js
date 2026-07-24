@@ -17,13 +17,30 @@ const { PRODUCT_VERSION: VERSION, ROOM_SCHEMA, GENERATION_SCHEMA, CONTENT_SCHEMA
 const { random, runWithSeed } = require("./lib/random");
 const { securityHeaders } = require("./lib/security");
 const { createRoomStore } = require("./lib/room_store");
+const { createPersistenceStatus } = require("./lib/persistence_status");
+const {
+  runPlatformDataPreflight
+} = require("./scripts/platform_data_preflight");
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
 const PUBLIC_DIR = path.join(__dirname, "public");
-const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, "data");
+const RAW_DATA_DIR = process.env.DATA_DIR;
+const DATA_DIR = RAW_DATA_DIR
+  ? path.resolve(RAW_DATA_DIR)
+  : path.join(__dirname, "data");
 const LEGACY_SAVE_FILES = [path.join(DATA_DIR, "rooms_v105.json")];
 const ROOM_TTL_MS = clampRoomTtl(process.env.ROOM_TTL_DAYS);
-const platform = createPlatform(__dirname, DATA_DIR);
+const persistenceStatus = createPersistenceStatus({
+  env: process.env,
+  dataDir: DATA_DIR,
+  rawDataDir: RAW_DATA_DIR,
+  expectedDataDir: process.env.EXPECTED_DATA_DIR
+});
+const roomStoreReporter = persistenceStatus.createStoreReporter("rooms");
+const platformStoreReporter =
+  persistenceStatus.createStoreReporter("platform");
+let platform = null;
+let startupCompleted = false;
 const startedAt = Date.now();
 const IS_TEST_RUNTIME = process.env.NODE_ENV === "test";
 const MIN_AUTOMATION_TIMEOUT_SECONDS = IS_TEST_RUNTIME ? 1 : 5;
@@ -42,7 +59,8 @@ const roomStore = createRoomStore({
   productVersion: VERSION,
   ttlMs: ROOM_TTL_MS,
   getRooms: () => rooms.values(),
-  legacyFiles: LEGACY_SAVE_FILES
+  legacyFiles: LEGACY_SAVE_FILES,
+  reporter: roomStoreReporter
 });
 const SKIP_VOTE = "__skip__";
 const VOTE_SYSTEMS = new Set(["exile", "tribunal"]);
@@ -3403,9 +3421,10 @@ function loadRooms() {
       if (room.game?.phase === "event" && !room.game.event) createEvent(room);
       rooms.set(room.code, room);
     }
-    if (parsed.length) saveRoomsSoon();
+    return parsed.length;
   } catch (error) {
-    console.warn("Збереження кімнат не завантажено:", error.message);
+    error.code ||= "ROOM_LOAD_FAILED";
+    throw error;
   }
 }
 function auth(room, playerId, playerToken) {
@@ -6726,6 +6745,44 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
     const pathname = decodeURIComponent(url.pathname);
 
+    networkMetrics.requests += 1;
+
+    if (pathname === "/api/health" && req.method === "GET") {
+      return jsonResponse(res, 200, {
+        ok: true,
+        status: "live",
+        rooms: rooms.size,
+        version: VERSION,
+        schemas: {
+          rooms: ROOM_SCHEMA,
+          generation: GENERATION_SCHEMA,
+          content: CONTENT_SCHEMA,
+          platform: PLATFORM_SCHEMA
+        },
+        uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000),
+        persistence: persistenceStatus.publicLivenessPersistence(),
+        network: {
+          activeLongPolls: [...roomStateWaiters.values()]
+            .reduce((sum, set) => sum + set.size, 0),
+          rateBuckets: requestBuckets.size,
+          ...networkMetrics
+        }
+      });
+    }
+
+    if (pathname === "/api/ready" && req.method === "GET") {
+      const readiness = persistenceStatus.publicReadiness();
+      return jsonResponse(res, readiness.ready ? 200 : 503, readiness);
+    }
+
+    if (!persistenceStatus.isReady()) {
+      return jsonResponse(res, 503, {
+        ok: false,
+        code: "STARTUP_NOT_READY",
+        error: "Service is not ready."
+      });
+    }
+
     // Render та інші хмарні проксі мають коректно відкривати головну адресу
     // без необхідності вручну додавати /index.html.
     if (pathname === "/" && (req.method === "GET" || req.method === "HEAD")) {
@@ -6736,10 +6793,8 @@ const server = http.createServer(async (req, res) => {
       return res.end();
     }
 
-    networkMetrics.requests += 1;
     const limitResult = pathname.startsWith("/api/") ? rateLimit(req, url, pathname) : null;
     if (limitResult && !limitResult.allowed) return jsonResponse(res, 429, { ok: false, error: `Забагато запитів. Повторіть через ${limitResult.retryAfter} с.`, retryAfterSeconds: limitResult.retryAfter }, rateHeaders(limitResult));
-    if (pathname === "/api/health" && req.method === "GET") return jsonResponse(res, 200, { ok: true, rooms: rooms.size, version: VERSION, schemas: { rooms: ROOM_SCHEMA, generation: GENERATION_SCHEMA, content: CONTENT_SCHEMA, platform: PLATFORM_SCHEMA }, uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000), persistent: true, persistence: { enabled: true, strategy: "atomic-per-room-json", dataDirectory: path.basename(DATA_DIR), roomTtlDays: Math.round(ROOM_TTL_MS / 86400000) }, network: { activeLongPolls: [...roomStateWaiters.values()].reduce((sum, set) => sum + set.size, 0), rateBuckets: requestBuckets.size, ...networkMetrics } }, limitResult ? rateHeaders(limitResult) : {});
 
     if (pathname === "/api/accounts/register" && req.method === "POST") {
       const result = platform.register(await readJson(req));
@@ -6995,6 +7050,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 const automationInterval = setInterval(() => {
+  if (!startupCompleted) return;
   for (const room of rooms.values()) {
     try {
       let changed = processHostFailover(room);
@@ -7020,10 +7076,12 @@ async function gracefulShutdown(signal, exitCode = 0) {
   const forceExit = setTimeout(() => process.exit(exitCode), 4_000);
   forceExit.unref();
   try {
-    await saveRoomsNow();
-    await backupRooms(`shutdown-${String(signal).toLowerCase()}`);
-    platform.saveAllNow();
-    platform.backup(`shutdown-${String(signal).toLowerCase()}`);
+    if (platform && startupCompleted) {
+      await saveRoomsNow();
+      await backupRooms(`shutdown-${String(signal).toLowerCase()}`);
+      platform.saveAllNow();
+      platform.backup(`shutdown-${String(signal).toLowerCase()}`);
+    }
   } catch (error) { console.error("Помилка фінального збереження:", error.message); }
   server.close(() => process.exit(exitCode));
   server.closeIdleConnections?.();
@@ -7036,8 +7094,43 @@ process.on("uncaughtException", (error) => {
   void gracefulShutdown("crash", 1);
 });
 
-loadRooms();
-void backupRooms("startup");
+async function bootstrap() {
+  let stage = "storage";
+  try {
+    const storageReady = await persistenceStatus.initializeStorage();
+    if (!storageReady) return;
+
+    stage = "platform-preflight";
+    runPlatformDataPreflight({ dataDir: DATA_DIR });
+
+    stage = "platform-load";
+    platform = createPlatform(__dirname, DATA_DIR, {
+      reporter: platformStoreReporter
+    });
+
+    stage = "room-load";
+    const loadedRoomCount = loadRooms();
+
+    stage = "startup-backup";
+    await Promise.all([
+      backupRooms("startup"),
+      Promise.resolve().then(() => platform.backup("startup"))
+    ]);
+
+    persistenceStatus.completeStartup();
+    startupCompleted = true;
+    if (loadedRoomCount) saveRoomsSoon();
+  } catch (error) {
+    const code = {
+      "platform-preflight": "PLATFORM_PREFLIGHT_FAILED",
+      "platform-load": "PLATFORM_LOAD_FAILED",
+      "room-load": "ROOM_LOAD_FAILED",
+      "startup-backup": "STARTUP_BACKUP_FAILED"
+    }[stage] || "STORAGE_PROBE_FAILED";
+    persistenceStatus.failStartup(code, error);
+  }
+}
+
 server.listen(PORT, HOST, () => {
   console.log(`\nСХОВИЩЕ ${VERSION} — сервер запущено\n`);
   console.log(`На цьому комп’ютері: http://localhost:${PORT}`);
@@ -7047,4 +7140,5 @@ server.listen(PORT, HOST, () => {
     }
   }
   console.log("\nНе закривайте це вікно, доки триває партія.\n");
+  void bootstrap();
 });

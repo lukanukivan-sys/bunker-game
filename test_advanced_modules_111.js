@@ -17,7 +17,7 @@ async function api(route, method = "GET", body = null, expectError = false) {
   if (!response.ok || !payload.ok) throw new Error(payload.error || `HTTP ${response.status}`);
   return payload;
 }
-async function waitReady() { for (let i=0;i<60;i++){ try { if ((await api("/api/health")).ok) return; } catch {} await new Promise(r=>setTimeout(r,100)); } throw new Error("server timeout"); }
+async function waitReady() { for (let i=0;i<60;i++){ try { if ((await api("/api/ready")).ready) return; } catch {} await new Promise(r=>setTimeout(r,100)); } throw new Error("server timeout"); }
 async function action(room, who, actionName, extra = {}, expectError = false) { return api(`/api/rooms/${room.code}/action`, "POST", { playerId: who.playerId, token: who.token, action: actionName, ...extra }, expectError); }
 async function state(room, who = room) { return api(`/api/rooms/${room.code}/state?playerId=${who.playerId}&token=${who.token}`); }
 async function create(modules, suffix) {
