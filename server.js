@@ -17,7 +17,10 @@ const { PRODUCT_VERSION: VERSION, ROOM_SCHEMA, GENERATION_SCHEMA, CONTENT_SCHEMA
 const { random, runWithSeed } = require("./lib/random");
 const { securityHeaders } = require("./lib/security");
 const { createRoomStore } = require("./lib/room_store");
-const { createPersistenceStatus } = require("./lib/persistence_status");
+const {
+  awaitAllStartupBackups,
+  createPersistenceStatus
+} = require("./lib/persistence_status");
 const {
   runPlatformDataPreflight
 } = require("./scripts/platform_data_preflight");
@@ -6760,7 +6763,6 @@ const server = http.createServer(async (req, res) => {
           platform: PLATFORM_SCHEMA
         },
         uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000),
-        persistence: persistenceStatus.publicLivenessPersistence(),
         network: {
           activeLongPolls: [...roomStateWaiters.values()]
             .reduce((sum, set) => sum + set.size, 0),
@@ -7112,9 +7114,9 @@ async function bootstrap() {
     const loadedRoomCount = loadRooms();
 
     stage = "startup-backup";
-    await Promise.all([
-      backupRooms("startup"),
-      Promise.resolve().then(() => platform.backup("startup"))
+    await awaitAllStartupBackups([
+      () => backupRooms("startup"),
+      () => platform.backup("startup")
     ]);
 
     persistenceStatus.completeStartup();
