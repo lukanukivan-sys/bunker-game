@@ -100,6 +100,30 @@ function assertNoInternalDetails(payload, internalPath) {
   assert.equal(source.includes("stack"), false);
 }
 
+function assertLivenessHasNoPersistence(payload) {
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(payload, "persistence"),
+    false
+  );
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(payload, "persistent"),
+    false
+  );
+  for (const field of [
+    "policy",
+    "mode",
+    "durable",
+    "writable",
+    "ready",
+    "stores"
+  ]) {
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(payload, field),
+      false
+    );
+  }
+}
+
 async function testEphemeralHealthAndReadiness() {
   const dataDir = tempDir("ephemeral");
   await startServer({
@@ -118,15 +142,7 @@ async function testEphemeralHealthAndReadiness() {
   assert.equal(typeof health.payload.uptimeSeconds, "number");
   assert.equal(typeof health.payload.schemas, "object");
   assert.equal(typeof health.payload.network, "object");
-  assert.equal(
-    Object.prototype.hasOwnProperty.call(health.payload, "persistent"),
-    false
-  );
-  assert.deepStrictEqual(health.payload.persistence, {
-    policy: "ephemeral-allowed",
-    mode: "ephemeral",
-    durable: false
-  });
+  assertLivenessHasNoPersistence(health.payload);
 
   const ready = await request("/api/ready");
   assert.equal(ready.response.status, 200);
@@ -182,6 +198,7 @@ async function testProductionPolicyIsFailClosed() {
   const health = await request("/api/health");
   assert.equal(health.response.status, 200);
   assert.equal(health.payload.ok, true);
+  assertLivenessHasNoPersistence(health.payload);
 }
 
 async function testPersistentMountValidation() {
