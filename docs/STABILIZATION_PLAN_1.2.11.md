@@ -111,6 +111,12 @@ mode: persistent
 - `continuityVerified` є окремою перевіркою безперервності між запуском
   попереднього й поточного процесу.
 
+Застосунок перевіряє явну політику, очікуваний mount path, фактичну
+writability та continuity sentinel. Він не здатний самостійно довести фізичний
+тип диска або його реальну довговічність. Тому `durabilityConfigured` і
+`durable` є твердженнями про перевірену конфігурацію та політику розгортання,
+а не апаратною атестацією носія.
+
 ### Sentinel безперервності
 
 У persistent-режимі використовується службовий sentinel:
@@ -130,7 +136,9 @@ mode: persistent
 
 - повертає `200`, доки HTTP-процес відповідає;
 - зберігає безпечні поля версії, uptime, schemas, rooms і network;
-- не містить безумовного `persistent: true`;
+- не містить об’єкта persistence або полів `policy`, `mode`, `durable`,
+  `writable`, `ready`, стану store чи будь-якого іншого твердження про
+  persistence/readiness;
 - не потрапляє під rate limiter;
 - повертає `Cache-Control: no-store`.
 
@@ -219,8 +227,9 @@ liveness endpoint для ручної діагностики й Docker `HEALTHCH
 - доказів втрати тестового файла або покриття між актуальними `45` і
   попереднім непідтвердженим `42/43` немає.
 
-Після додавання двох P0-регресій актуальний discovery містить `47` тестів, а
-`--unit` — `46`.
+Після початкового додавання двох P0-регресій discovery містив `47` тестів, а
+`--unit` — `46`. Після виправлень за незалежним рев’ю додано ще дві окремі
+регресії; актуальний повторний запуск містить `49` тестів, а `--unit` — `48`.
 
 ## Що не входить до наступного P0-пакета
 
@@ -255,15 +264,12 @@ liveness endpoint для ручної діагностики й Docker `HEALTHCH
 | Команда | Результат |
 |---|---|
 | `npm ci` | успішно; залежності актуальні |
-| `npm test` | `47/47` із локальним sandbox-shim |
-| `npm run test:unit` | `46/46` із локальним sandbox-shim |
+| `npm test` | `49/49` із локальним sandbox-shim |
+| `npm run test:unit` | `48/48` із локальним sandbox-shim |
 | `npm run audit` | успішно: 9439 полів і 105/105 здібностей |
 | `npm run check:syntax` | успішно |
-| `npm run verify` | успішно: `47/47`, обидва аудити й syntax |
+| `npm run verify` | успішно: `49/49`, обидва аудити й syntax |
 | цільові persistence/room/platform/preflight регресії | усі успішні |
-| `npx -y node@20 run_all_tests.js` | `47/47` |
-| `npx -y node@20 run_all_tests.js --unit` | `46/46` |
-| `npx -y node@22 run_all_tests.js` | `47/47` |
 
 Локальний runner має Node 24 і забороняє системний виклик
 `uv_interface_addresses`. Тому звичайний базовий `npm test` на незміненому
@@ -273,9 +279,23 @@ liveness endpoint для ручної діагностики й Docker `HEALTHCH
 diff. Реальний запуск без shim перевіряє GitHub Actions.
 
 У локальному середовищі немає `docker`, `podman`, `nerdctl` або `buildah`.
-Тому Docker build/smoke має бути підтверджений обов’язковим job
-`docker-smoke` у PR CI. Результат CI додається до підсумкового звіту PR;
-локальний Docker-успіх не заявляється.
+Тому локальний Docker-успіх не заявляється.
+
+## Фактичний CI PR №7 до незалежного рев’ю
+
+GitHub Actions run `30102042819` для початкового head
+`45c25351228625e2e852c1d8afb39fbb5926851c` завершився успішно:
+
+- Node 20.20.2 — `47/47`, audit і syntax успішні;
+- Node 22.23.1 — `47/47`, audit і syntax успішні;
+- `docker-smoke` — image зібрано; для `ephemeral-allowed` перевірено `200`
+  та JSON-body liveness/readiness з `durable: false`; для несправного
+  `persistent-required` перевірено liveness `200`, readiness `503` і
+  fail-closed JSON-body.
+
+Цей run підтверджує початковий head PR №7, але не підміняє повторний CI після
+виправлень за `REQUEST CHANGES`. Для нового head обов’язково повторно
+очікуються Node 20, Node 22 і Docker smoke.
 
 Відомі нефатальні попередження локального середовища:
 
