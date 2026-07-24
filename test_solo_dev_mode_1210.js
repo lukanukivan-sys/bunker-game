@@ -5,6 +5,7 @@ const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
 const { stopChildProcess } = require("./test_support");
+const { PRODUCT_VERSION } = require("./config/version");
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "shelter-solo-"));
 const port = 33800 + Math.floor(Math.random() * 500);
@@ -22,10 +23,10 @@ async function api(route, options = {}) {
 }
 async function waitReady() {
   for (let i = 0; i < 50; i += 1) {
-    try { if ((await api("/api/health")).version === "1.2.10") return; } catch {}
+    try { if ((await api("/api/health")).version === PRODUCT_VERSION) return; } catch {}
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw new Error("Сервер не запустився.");
+  throw new Error(`Сервер ${PRODUCT_VERSION} не запустився.`);
 }
 (async () => {
   server = spawn(process.execPath, ["server.js"], { cwd: __dirname, env: { ...process.env, PORT: String(port), HOST: "127.0.0.1", DATA_DIR: dataDir }, stdio: ["ignore", "pipe", "pipe"] });
@@ -86,7 +87,7 @@ async function waitReady() {
   assert(current.game.final, "Фінальний результат повинен бути сформований");
   await stopChildProcess(server);
   fs.rmSync(dataDir, { recursive: true, force: true });
-  console.log("1.2.10: соло-тестування дозволяє самоголосування й повне проходження до фіналу.");
+  console.log(`${PRODUCT_VERSION}: соло-тестування дозволяє самоголосування й повне проходження до фіналу.`);
 })().catch(async (error) => {
   console.error(error);
   await stopChildProcess(server);
