@@ -5,6 +5,7 @@ const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
 const { stopChildProcess } = require("./test_support");
+const { PRODUCT_VERSION } = require("./config/version");
 
 const baseDir = __dirname;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "shelter-api-"));
@@ -24,7 +25,7 @@ async function api(route, options = {}) {
 }
 async function waitReady() {
   for (let i = 0; i < 50; i += 1) {
-    try { const health = await api("/api/health"); if (health.version === "1.2.10") return; } catch {}
+    try { const health = await api("/api/health"); if (health.version === PRODUCT_VERSION) return; } catch {}
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error("Сервер не запустився.");
@@ -82,7 +83,7 @@ async function stop() {
   assert.equal(health.rooms, 1);
   await stop();
   fs.rmSync(dataDir, { recursive: true, force: true });
-  console.log("Повний локальний HTTP-цикл 1.2.10 перевірено: профіль, кампанія, набір, партія, фінал і відновлення після перезапуску.");
+  console.log(`Повний локальний HTTP-цикл ${PRODUCT_VERSION} перевірено: профіль, кампанія, набір, партія, фінал і відновлення після перезапуску.`);
 })().catch(async (error) => {
   console.error(error);
   await stop();
