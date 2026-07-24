@@ -294,8 +294,21 @@ GitHub Actions run `30102042819` для початкового head
   fail-closed JSON-body.
 
 Цей run підтверджує початковий head PR №7, але не підміняє повторний CI після
-виправлень за `REQUEST CHANGES`. Для нового head обов’язково повторно
-очікуються Node 20, Node 22 і Docker smoke.
+виправлень за `REQUEST CHANGES`.
+
+## Фактичний CI PR №7 після виправлень за рев’ю
+
+GitHub Actions run `30104305731` для post-fix head
+`1945dca99718dc48d265b1b291b357deda171a88` завершився успішно:
+
+- Node 20.20.2 — `49/49`, audit і syntax успішні;
+- Node 22.23.1 — `49/49`, audit і syntax успішні;
+- `docker-smoke` — image зібрано; успішно перевірено liveness/readiness
+  JSON-body для `ephemeral-allowed` та liveness `200` / readiness `503`
+  із fail-closed JSON-body для несправного `persistent-required`.
+
+Цей run охоплює всі виправлення коду та нові persistence-регресії. Подальше
+оновлення плану з цим результатом не змінює runtime-код.
 
 Відомі нефатальні попередження локального середовища:
 
