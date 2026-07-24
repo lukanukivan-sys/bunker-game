@@ -15,7 +15,7 @@ async function api(route, method = "GET", body = null) {
   if (!response.ok || !payload.ok) throw new Error(payload.error || `HTTP ${response.status}`);
   return payload;
 }
-async function ready() { for (let i = 0; i < 60; i += 1) { try { if ((await api("/api/health")).ok) return; } catch {} await new Promise(r => setTimeout(r, 100)); } throw new Error("server timeout"); }
+async function ready() { for (let i = 0; i < 60; i += 1) { try { if ((await api("/api/ready")).ready) return; } catch {} await new Promise(r => setTimeout(r, 100)); } throw new Error("server timeout"); }
 async function action(code, session, actionName, extra = {}) { return api(`/api/rooms/${code}/action`, "POST", { playerId: session.playerId, token: session.token, action: actionName, ...extra }); }
 async function state(code, session) { return api(`/api/rooms/${code}/state?playerId=${session.playerId}&token=${session.token}`); }
 async function makeGame(characterSetMode, customCharacterKeys = [], setting = "modern") {

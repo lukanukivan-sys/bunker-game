@@ -18,7 +18,7 @@ async function api(route, method = "GET", body = null) {
   if (!response.ok || !payload.ok) throw new Error(payload.error || `HTTP ${response.status}`);
   return payload;
 }
-async function ready() { for (let i = 0; i < 50; i += 1) { try { if ((await api("/api/health")).version === PRODUCT_VERSION) return; } catch {} await new Promise((r) => setTimeout(r, 100)); } throw new Error("Сервер не запустився."); }
+async function ready() { for (let i = 0; i < 50; i += 1) { try { if ((await api("/api/ready")).ready) return; } catch {} await new Promise((r) => setTimeout(r, 100)); } throw new Error("Сервер не запустився."); }
 async function stop() {
   await stopChildProcess(child);
 }

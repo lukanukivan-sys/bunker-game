@@ -111,7 +111,7 @@ async function request(route, options = {}) {
 }
 async function waitForServer() {
   for (let i = 0; i < 80; i += 1) {
-    try { if ((await request("/api/health")).response.ok) return; } catch {}
+    try { if ((await request("/api/ready")).response.ok) return; } catch {}
     await sleep(100);
   }
   throw new Error(`Server did not start: ${output}`);

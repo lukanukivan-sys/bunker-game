@@ -21,7 +21,7 @@ async function api(route, options = {}) {
 }
 (async () => {
   server = spawn(process.execPath, ["server.js"], { cwd: __dirname, env: { ...process.env, PORT: String(port), HOST: "127.0.0.1", DATA_DIR: dataDir }, stdio: "ignore" });
-  for (let i = 0; i < 50; i += 1) { try { if ((await api("/api/health")).version) break; } catch {} await sleep(100); }
+  for (let i = 0; i < 50; i += 1) { try { if ((await api("/api/ready")).ready) break; } catch {} await sleep(100); }
   const room = await api("/api/rooms/create", { method: "POST", body: {
     name: "Розширений тест", mode: "classic", setting: "modern", scenarioMode: "procedural",
     capacity: 3, rounds: 4, revealsPerRound: 2, characterSetMode: "extended",

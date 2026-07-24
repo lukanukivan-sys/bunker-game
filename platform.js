@@ -148,8 +148,9 @@ function validatePack(input, ownerAccountId = null, existingId = null) {
   };
 }
 
-function createPlatform(baseDir, dataDirOverride = null) {
+function createPlatform(baseDir, dataDirOverride = null, options = {}) {
   const dataDir = dataDirOverride ? path.resolve(dataDirOverride) : path.join(baseDir, "data");
+  const reporter = options.reporter || null;
   const files = {
     accounts: path.join(dataDir, "accounts_v1.json"),
     campaigns: path.join(dataDir, "campaigns_v1.json"),
@@ -187,16 +188,30 @@ function createPlatform(baseDir, dataDirOverride = null) {
 
   let saveTimer = null;
   function saveAllNow() {
-    atomicWrite(files.accounts, [...accounts.values()]);
-    atomicWrite(files.campaigns, [...campaigns.values()]);
-    atomicWrite(files.packs, [...packs.values()]);
-    atomicWrite(files.stats, globalStats);
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    try {
+      atomicWrite(files.accounts, [...accounts.values()]);
+      atomicWrite(files.campaigns, [...campaigns.values()]);
+      atomicWrite(files.packs, [...packs.values()]);
+      atomicWrite(files.stats, globalStats);
+      reporter?.saveSucceeded?.({ at: Date.now() });
+    } catch (error) {
+      reporter?.saveFailed?.(error);
+      throw error;
+    }
   }
   function saveSoon() {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      try { saveAllNow(); } catch (error) { console.error("Помилка збереження платформи:", error.message); }
+      saveTimer = null;
+      try {
+        saveAllNow();
+      } catch (error) {
+        console.error("Помилка збереження платформи:", error.message);
+      }
     }, 180);
+    saveTimer.unref?.();
   }
   function backup(label = "startup") {
     try {
@@ -210,7 +225,16 @@ function createPlatform(baseDir, dataDirOverride = null) {
       atomicWrite(path.join(backupDir, `${stamp}_${label}.json`), snapshot);
       const old = fs.readdirSync(backupDir).filter((name) => name.endsWith(".json")).sort().reverse().slice(12);
       for (const name of old) fs.unlinkSync(path.join(backupDir, name));
-    } catch (error) { console.warn("Резервну копію платформи не створено:", error.message); }
+      reporter?.backupSucceeded?.({
+        label,
+        status: "completed",
+        at: Date.now()
+      });
+      return "completed";
+    } catch (error) {
+      reporter?.backupFailed?.({ label, error });
+      throw error;
+    }
   }
   function authenticate(accountId, authToken) {
     const account = accounts.get(String(accountId || ""));
@@ -433,7 +457,6 @@ function createPlatform(baseDir, dataDirOverride = null) {
     };
   }
 
-  backup("startup");
   return {
     authenticate, publicAccount, register, login, resetPassword, listSessions, revokeSession, saveSoon, saveAllNow, backup,
     createCampaign, listCampaigns, getCampaign, campaignForRoom,

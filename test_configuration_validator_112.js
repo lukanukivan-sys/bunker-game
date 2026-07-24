@@ -17,7 +17,7 @@ async function api(route, method = "GET", body = null, allowError = false) {
 }
 async function ready() {
   for (let i = 0; i < 60; i += 1) {
-    try { if ((await api("/api/health")).payload.ok) return; } catch {}
+    try { if ((await api("/api/ready")).payload.ready) return; } catch {}
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error("server timeout");

@@ -231,6 +231,47 @@ function testDuplicateIdsCannotBeSilentlyCollapsedByMap() {
   );
 }
 
+function testSaveFailureRecoveryAndBackupPropagation() {
+  const dataDir = createTempDataDir("write-recovery");
+  writeStores(dataDir);
+  const events = [];
+  const platform = createPlatform(__dirname, dataDir, {
+    reporter: {
+      saveSucceeded: () => events.push("save-ok"),
+      saveFailed: () => events.push("save-failed"),
+      backupSucceeded: ({ status }) =>
+        events.push(`backup-${status}`),
+      backupFailed: () => events.push("backup-failed")
+    }
+  });
+
+  try {
+    platform.saveAllNow();
+    assert.equal(events.at(-1), "save-ok");
+
+    fs.rmSync(dataDir, { recursive: true, force: true });
+    fs.writeFileSync(dataDir, "blocks data directory", "utf8");
+    assert.throws(() => platform.saveAllNow());
+    assert.equal(events.at(-1), "save-failed");
+
+    fs.unlinkSync(dataDir);
+    fs.mkdirSync(dataDir, { recursive: true });
+    platform.saveAllNow();
+    assert.equal(events.at(-1), "save-ok");
+
+    const backupDir = path.join(dataDir, "backups");
+    fs.writeFileSync(backupDir, "blocks backup directory", "utf8");
+    assert.throws(() => platform.backup("startup"));
+    assert.equal(events.at(-1), "backup-failed");
+
+    fs.unlinkSync(backupDir);
+    assert.equal(platform.backup("startup"), "completed");
+    assert.equal(events.at(-1), "backup-completed");
+  } finally {
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  }
+}
+
 function main() {
   testMissingStoresUseExplicitDefaults();
   testValidStoresProduceDiagnosticReport();
@@ -238,7 +279,10 @@ function main() {
   testInvalidRootShapeIsAlsoReserved();
   testMultipleFailuresAreReportedAndReservedTogether();
   testDuplicateIdsCannotBeSilentlyCollapsedByMap();
-  console.log("✅ Platform store safety 1.2.11 regression tests passed.");
+  testSaveFailureRecoveryAndBackupPropagation();
+  console.log(
+    "✅ Platform store safety, write recovery and backup status verified."
+  );
 }
 
 main();

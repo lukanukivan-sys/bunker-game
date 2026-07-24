@@ -31,7 +31,7 @@ async function api(route, method = "GET", body = null) {
 }
 async function ready() {
   for (let i = 0; i < 60; i += 1) {
-    try { if ((await api("/api/health")).version === PRODUCT_VERSION) return; } catch {}
+    try { if ((await api("/api/ready")).ready) return; } catch {}
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error(`Сервер ${PRODUCT_VERSION} не запустився.`);

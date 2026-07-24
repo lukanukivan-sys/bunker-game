@@ -43,7 +43,7 @@ async function action(session, actionName, extra = {}) {
 async function waitForServer() {
   for (let i = 0; i < 80; i += 1) {
     try {
-      const result = await request("/api/health");
+      const result = await request("/api/ready");
       if (result.response.ok) return;
     } catch {}
     await sleep(100);

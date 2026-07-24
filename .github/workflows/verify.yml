@@ -69,19 +69,58 @@ jobs:
         run: docker build -t skhovyshche:${{ github.sha }} .
 
       - name: Start container
-        run: docker run --rm -d --name skhovyshche-smoke -p 3000:3000 skhovyshche:${{ github.sha }}
+        run: |
+          docker run --rm -d \
+            --name skhovyshche-smoke \
+            -e PERSISTENCE_MODE=ephemeral-allowed \
+            -p 3000:3000 \
+            skhovyshche:${{ github.sha }}
 
-      - name: Wait for health check
+      - name: Verify liveness and readiness
         run: |
           for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:3000/api/health >/dev/null; then
-              exit 0
+            if curl --fail --silent http://127.0.0.1:3000/api/ready > ready.json; then
+              break
             fi
             sleep 1
           done
-          docker logs skhovyshche-smoke
-          exit 1
+          curl --fail --silent http://127.0.0.1:3000/api/health > health.json
+          curl --fail --silent http://127.0.0.1:3000/api/ready > ready.json
+          node -e "
+            const fs = require('node:fs');
+            const health = JSON.parse(fs.readFileSync('health.json'));
+            const ready = JSON.parse(fs.readFileSync('ready.json'));
+            if (!health.ok || health.status !== 'live') process.exit(1);
+            if (!ready.ready || ready.persistence.policy !== 'ephemeral-allowed') process.exit(1);
+            if (ready.persistence.mode !== 'ephemeral' || ready.persistence.durable !== false) process.exit(1);
+          "
 
-      - name: Stop container
+      - name: Verify persistent mode fails closed
+        run: |
+          docker run --rm -d \
+            --name skhovyshche-persistent-failure \
+            -e PERSISTENCE_MODE=persistent-required \
+            -e DATA_DIR=/proc/skhovyshche-data \
+            -e EXPECTED_DATA_DIR=/proc/skhovyshche-data \
+            -p 3001:3000 \
+            skhovyshche:${{ github.sha }}
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3001/api/health > persistent-health.json; then
+              break
+            fi
+            sleep 1
+          done
+          test "$(curl --silent --output persistent-ready.json --write-out '%{http_code}' http://127.0.0.1:3001/api/ready)" = "503"
+          node -e "
+            const fs = require('node:fs');
+            const health = JSON.parse(fs.readFileSync('persistent-health.json'));
+            const ready = JSON.parse(fs.readFileSync('persistent-ready.json'));
+            if (!health.ok || health.status !== 'live') process.exit(1);
+            if (ready.ready || ready.ok) process.exit(1);
+          "
+
+      - name: Stop containers
         if: always()
-        run: docker stop skhovyshche-smoke || true
+        run: |
+          docker stop skhovyshche-smoke || true
+          docker stop skhovyshche-persistent-failure || true
