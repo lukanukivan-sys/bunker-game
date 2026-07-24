@@ -1,4 +1,4 @@
-name: Debug version literals
+name: Debug version readiness literals
 
 on:
   pull_request:
@@ -20,7 +20,7 @@ jobs:
           const fs = require('fs');
           const files = fs.readdirSync('.')
             .filter((name) => /^test_.*\.js$/.test(name))
-            .filter((name) => fs.readFileSync(name, 'utf8').includes('1.2.10'))
+            .filter((name) => fs.readFileSync(name, 'utf8').includes('.version === "1.2.10"'))
             .sort();
           process.stdout.write(`files=${JSON.stringify(files)}\n`);
           NODE
@@ -32,6 +32,6 @@ jobs:
       fail-fast: false
       matrix:
         file: ${{ fromJSON(needs.discover.outputs.files) }}
-    name: version literal ${{ matrix.file }}
+    name: readiness literal ${{ matrix.file }}
     steps:
-      - run: echo "${{ matrix.file }} still contains a hard-coded product version"
+      - run: echo "${{ matrix.file }} compares health.version to a hard-coded value"
