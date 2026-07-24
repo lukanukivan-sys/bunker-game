@@ -5,6 +5,7 @@ const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
 const { stopChildProcess } = require("./test_support");
+const { PRODUCT_VERSION } = require("./config/version");
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "shelter-balance-"));
 const port = 32700 + Math.floor(Math.random() * 400);
@@ -17,7 +18,7 @@ async function api(route, method = "GET", body = null) {
   if (!response.ok || !payload.ok) throw new Error(payload.error || `HTTP ${response.status}`);
   return payload;
 }
-async function ready() { for (let i = 0; i < 50; i += 1) { try { if ((await api("/api/health")).version === "1.2.10") return; } catch {} await new Promise((r) => setTimeout(r, 100)); } throw new Error("Сервер не запустився."); }
+async function ready() { for (let i = 0; i < 50; i += 1) { try { if ((await api("/api/health")).version === PRODUCT_VERSION) return; } catch {} await new Promise((r) => setTimeout(r, 100)); } throw new Error("Сервер не запустився."); }
 async function stop() {
   await stopChildProcess(child);
 }
@@ -48,5 +49,5 @@ async function state(code, session) { return api(`/api/rooms/${code}/state?playe
     for (const value of Object.values(hostState.game.shelter.resources)) assert(value >= 0 && value <= 100, `${setting}: ресурс поза межами`);
   }
   await stop(); fs.rmSync(dataDir, { recursive: true, force: true });
-  console.log("Баланс 1.2.10 перевірено для 7 сетингів: щонайменше 40% без активної хвороби, унікальні ролі й здібності, до 6 експедицій, ресурси 0–100.");
+  console.log(`Баланс ${PRODUCT_VERSION} перевірено для 7 сетингів: щонайменше 40% без активної хвороби, унікальні ролі й здібності, до 6 експедицій, ресурси 0–100.`);
 })().catch(async (error) => { console.error(error); await stop(); fs.rmSync(dataDir, { recursive: true, force: true }); process.exit(1); });

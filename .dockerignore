@@ -1,7 +1,12 @@
 .git
 .gitignore
+.github
 node_modules
-data/*.json
-data/*.tmp
-data/backups
+npm-debug.log*
+data
+backups
+*.zip
+*.sha256
+*.tmp
 *.log
+TEST_REPORT*.md

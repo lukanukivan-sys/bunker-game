@@ -7,6 +7,7 @@ const { spawn } = require("child_process");
 const { stopChildProcess, testServerEnv } = require("./test_support");
 const MEDICAL = require("./content/medical");
 const { describeCharacteristic } = require("./content/character_descriptions");
+const { PRODUCT_VERSION } = require("./config/version");
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "shelter-103-"));
 const port = 33400 + Math.floor(Math.random() * 300);
@@ -28,10 +29,10 @@ async function api(route, method = "GET", body = null) {
 }
 async function ready() {
   for (let i = 0; i < 50; i += 1) {
-    try { if ((await api("/api/health")).version === "1.2.10") return; } catch {}
+    try { if ((await api("/api/health")).version === PRODUCT_VERSION) return; } catch {}
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw new Error("Сервер 1.2.10 не запустився.");
+  throw new Error(`Сервер ${PRODUCT_VERSION} не запустився.`);
 }
 async function stop() {
   await stopChildProcess(child);
@@ -78,6 +79,7 @@ async function state(code, session) {
       assert(mirror.includes(`«${name}»`), `${name} і ${mentioned[0].self.name} мають неузгоджені взаємини`);
     }
   }
+  void byName;
   const shelter = states[0].game.shelter;
   assert(shelter.roomCount <= 7, `Забагато приміщень: ${shelter.roomCount}`);
   assert(shelter.rooms.length <= 6, `Забагато типів приміщень: ${shelter.rooms.length}`);
@@ -87,7 +89,7 @@ async function state(code, session) {
 
   await stop();
   fs.rmSync(dataDir, { recursive: true, force: true });
-  console.log("1.2.10: сумісність здібностей із режимом, прості сімейні статуси, двосторонні взаємини, компактне сховище й безпліддя перевірено.");
+  console.log(`${PRODUCT_VERSION}: сумісність здібностей із режимом, прості сімейні статуси, двосторонні взаємини, компактне сховище й безпліддя перевірено.`);
 })().catch(async (error) => {
   console.error(error);
   await stop();

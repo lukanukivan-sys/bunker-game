@@ -5,13 +5,14 @@ const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
 const { stopChildProcess } = require("./test_support");
+const { PRODUCT_VERSION } = require("./config/version");
 const baseDir = __dirname;
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "shelter-detective-final-105-"));
 const port = 33500 + Math.floor(Math.random() * 200);
 const base = `http://127.0.0.1:${port}`;
 let server;
 async function api(route, options = {}) { const response = await fetch(base + route, { method: options.method || "GET", headers: options.body ? { "Content-Type": "application/json" } : undefined, body: options.body ? JSON.stringify(options.body) : undefined }); const payload = await response.json(); if (!response.ok || !payload.ok) throw new Error(payload.error || `HTTP ${response.status}`); return payload; }
-async function ready() { for (let i = 0; i < 60; i += 1) { try { if ((await api("/api/health")).version === "1.2.10") return; } catch {} await new Promise((resolve) => setTimeout(resolve, 100)); } throw new Error("Сервер не запустився"); }
+async function ready() { for (let i = 0; i < 60; i += 1) { try { if ((await api("/api/health")).version === PRODUCT_VERSION) return; } catch {} await new Promise((resolve) => setTimeout(resolve, 100)); } throw new Error("Сервер не запустився"); }
 async function stop() {
   await stopChildProcess(server);
 }
@@ -81,5 +82,5 @@ async function stop() {
   assert(Array.isArray(result.publicClaims));
   assert(Array.isArray(result.investigationLog));
   await stop(); fs.rmSync(dataDir, { recursive: true, force: true });
-  console.log(`1.2.10: повний детективний фінал перевірено; доказова сила ${result.evidenceStrength}/${result.requiredEvidence}, solved=${result.solved}.`);
+  console.log(`${PRODUCT_VERSION}: повний детективний фінал перевірено; доказова сила ${result.evidenceStrength}/${result.requiredEvidence}, solved=${result.solved}.`);
 })().catch(async (error) => { console.error(error); await stop(); fs.rmSync(dataDir, { recursive: true, force: true }); process.exit(1); });

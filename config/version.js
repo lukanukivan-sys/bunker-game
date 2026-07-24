@@ -1,6 +1,6 @@
 "use strict";
 
-const PRODUCT_VERSION = "1.2.10";
+const PRODUCT_VERSION = "1.2.11";
 const ROOM_SCHEMA = "rooms-v6";
 const GENERATION_SCHEMA = "1.2.9-g2";
 const CONTENT_SCHEMA = "content-1.2.9-c1";
