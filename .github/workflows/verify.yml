@@ -32,8 +32,14 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Verify tests, audits and syntax
-        run: npm run verify
+      - name: Run tests
+        run: npm test
+
+      - name: Audit content and abilities
+        run: npm run audit
+
+      - name: Check syntax
+        run: npm run check:syntax
 
   docker-smoke:
     runs-on: ubuntu-latest
